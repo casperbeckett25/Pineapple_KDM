@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Car, Shield, DollarSign, CheckCircle, AlertCircle, Loader2, Send, Calculator } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
@@ -53,6 +53,11 @@ interface QuickQuoteFormData {
 
 interface FormErrors {
   [key: string]: string;
+}
+
+interface QuoteResult {
+  premium: number;
+  excess: number;
 }
 
 function App() {
@@ -111,6 +116,41 @@ function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [apiResponse, setApiResponse] = useState<any>(null);
+
+  // Generate external reference ID on component mount
+  useEffect(() => {
+    const generateExternalRefId = () => {
+      return Date.now().toString() + Math.random().toString(36).substr(2, 5);
+    };
+    
+    setQuickQuoteData(prev => ({
+      ...prev,
+      externalReferenceId: generateExternalRefId()
+    }));
+  }, []);
+
+  // Function to extract date of birth from South African ID number
+  const extractDateOfBirthFromId = (idNumber: string): string => {
+    if (idNumber.length !== 13) return '';
+    
+    const year = idNumber.substring(0, 2);
+    const month = idNumber.substring(2, 4);
+    const day = idNumber.substring(4, 6);
+    
+    // Determine century (assuming current year is 2024)
+    const currentYear = new Date().getFullYear();
+    const currentCentury = Math.floor(currentYear / 100);
+    const yearNum = parseInt(year);
+    
+    let fullYear;
+    if (yearNum <= (currentYear % 100)) {
+      fullYear = currentCentury * 100 + yearNum;
+    } else {
+      fullYear = (currentCentury - 1) * 100 + yearNum;
+    }
+    
+    return `${fullYear}-${month}-${day}`;
+  };
 
   const validateTransferForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -202,10 +242,6 @@ function App() {
       newErrors.licenseIssueDate = 'License issue date is required';
     }
     
-    if (!quickQuoteData.dateOfBirth) {
-      newErrors.dateOfBirth = 'Date of birth is required';
-    }
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -217,13 +253,34 @@ function App() {
     if (activeTab === 'transfer') {
       setFormData(prev => ({ ...prev, [name]: finalValue }));
     } else {
-      setQuickQuoteData(prev => ({ ...prev, [name]: finalValue }));
+      setQuickQuoteData(prev => {
+        const newData = { ...prev, [name]: finalValue };
+        
+        // Auto-extract date of birth from ID number
+        if (name === 'idNumber' && typeof finalValue === 'string' && finalValue.length === 13) {
+          const extractedDate = extractDateOfBirthFromId(finalValue);
+          if (extractedDate) {
+            newData.dateOfBirth = extractedDate;
+          }
+        }
+        
+        return newData;
+      });
     }
     
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
+  };
+
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('en-ZA', {
+      style: 'currency',
+      currency: 'ZAR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
   };
 
   const handleTransferSubmit = async (e: React.FormEvent) => {
@@ -432,9 +489,9 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-yellow-50 to-green-50">
+    <div className="min-h-screen bg-gray-900">
       {/* Header */}
-      <div className="bg-white shadow-lg border-b-4 border-gradient-to-r from-orange-400 to-green-500">
+      <div className="bg-gray-800 shadow-lg border-b-4 border-orange-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
             <div className="flex items-center space-x-4">
@@ -443,12 +500,12 @@ function App() {
                 alt="Kodom Connect Logo" 
                 className="h-12 w-auto"
               />
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-green-600 bg-clip-text text-transparent">
+              <h1 className="text-2xl font-bold text-orange-400">
                 Kodom Connect
               </h1>
             </div>
-            <div className="flex items-center space-x-3 text-sm text-gray-700">
-              <Shield className="h-5 w-5 text-green-600" />
+            <div className="flex items-center space-x-3 text-sm text-gray-300">
+              <Shield className="h-5 w-5 text-green-400" />
               <span className="font-medium">Trusted & Secure</span>
             </div>
           </div>
@@ -457,14 +514,14 @@ function App() {
 
       {/* Tab Navigation */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-        <div className="bg-white rounded-t-2xl shadow-lg border-b-0">
+        <div className="bg-gray-800 rounded-t-2xl shadow-lg border-b-0">
           <div className="flex">
             <button
               onClick={() => setActiveTab('transfer')}
               className={`flex-1 px-6 py-4 text-lg font-semibold rounded-tl-2xl transition-all duration-300 ${
                 activeTab === 'transfer'
-                  ? 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-orange-600 text-white shadow-lg'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
             >
               <div className="flex items-center justify-center space-x-2">
@@ -476,8 +533,8 @@ function App() {
               onClick={() => setActiveTab('quote')}
               className={`flex-1 px-6 py-4 text-lg font-semibold rounded-tr-2xl transition-all duration-300 ${
                 activeTab === 'quote'
-                  ? 'bg-gradient-to-r from-green-500 to-blue-500 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-green-600 text-white shadow-lg'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
             >
               <div className="flex items-center justify-center space-x-2">
@@ -491,23 +548,23 @@ function App() {
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-        <div className="bg-white rounded-b-2xl shadow-xl border-t-0">
+        <div className="bg-gray-800 rounded-b-2xl shadow-xl border-t-0">
           {activeTab === 'transfer' ? (
             <div className="p-8">
               <div className="text-center mb-8">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-orange-100 to-yellow-100 rounded-full mb-4">
-                  <Send className="h-8 w-8 text-orange-600" />
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-600 rounded-full mb-4">
+                  <Send className="h-8 w-8 text-white" />
                 </div>
-                <h2 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-yellow-600 bg-clip-text text-transparent mb-2">
+                <h2 className="text-3xl font-bold text-orange-400 mb-2">
                   Transfer Lead
                 </h2>
-                <p className="text-gray-600">Submit lead information for processing</p>
+                <p className="text-gray-400">Submit lead information for processing</p>
               </div>
 
               <form onSubmit={handleTransferSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label htmlFor="first_name" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="first_name" className="block text-sm font-medium text-gray-300 mb-2">
                       First Name *
                     </label>
                     <input
@@ -516,20 +573,20 @@ function App() {
                       name="first_name"
                       value={formData.first_name}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 ${
+                      className={`w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
                         errors.first_name
-                          ? 'border-red-300 focus:border-red-500'
-                          : 'border-gray-200 focus:border-orange-400'
-                      } focus:outline-none focus:ring-2 focus:ring-orange-100`}
+                          ? 'border-red-500 focus:border-red-400'
+                          : 'border-gray-600 focus:border-orange-400'
+                      } focus:outline-none focus:ring-2 focus:ring-orange-500/20`}
                       placeholder="Enter first name"
                     />
                     {errors.first_name && (
-                      <p className="mt-1 text-sm text-red-600">{errors.first_name}</p>
+                      <p className="mt-1 text-sm text-red-400">{errors.first_name}</p>
                     )}
                   </div>
 
                   <div>
-                    <label htmlFor="last_name" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="last_name" className="block text-sm font-medium text-gray-300 mb-2">
                       Last Name *
                     </label>
                     <input
@@ -538,21 +595,21 @@ function App() {
                       name="last_name"
                       value={formData.last_name}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 ${
+                      className={`w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
                         errors.last_name
-                          ? 'border-red-300 focus:border-red-500'
-                          : 'border-gray-200 focus:border-orange-400'
-                      } focus:outline-none focus:ring-2 focus:ring-orange-100`}
+                          ? 'border-red-500 focus:border-red-400'
+                          : 'border-gray-600 focus:border-orange-400'
+                      } focus:outline-none focus:ring-2 focus:ring-orange-500/20`}
                       placeholder="Enter last name"
                     />
                     {errors.last_name && (
-                      <p className="mt-1 text-sm text-red-600">{errors.last_name}</p>
+                      <p className="mt-1 text-sm text-red-400">{errors.last_name}</p>
                     )}
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                     Email Address *
                   </label>
                   <input
@@ -561,21 +618,21 @@ function App() {
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 ${
+                    className={`w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
                       errors.email
-                        ? 'border-red-300 focus:border-red-500'
-                        : 'border-gray-200 focus:border-orange-400'
-                    } focus:outline-none focus:ring-2 focus:ring-orange-100`}
+                        ? 'border-red-500 focus:border-red-400'
+                        : 'border-gray-600 focus:border-orange-400'
+                    } focus:outline-none focus:ring-2 focus:ring-orange-500/20`}
                     placeholder="Enter email address"
                   />
                   {errors.email && (
-                    <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                    <p className="mt-1 text-sm text-red-400">{errors.email}</p>
                   )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label htmlFor="contact_number" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="contact_number" className="block text-sm font-medium text-gray-300 mb-2">
                       Contact Number *
                     </label>
                     <input
@@ -584,20 +641,20 @@ function App() {
                       name="contact_number"
                       value={formData.contact_number}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 ${
+                      className={`w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
                         errors.contact_number
-                          ? 'border-red-300 focus:border-red-500'
-                          : 'border-gray-200 focus:border-orange-400'
-                      } focus:outline-none focus:ring-2 focus:ring-orange-100`}
+                          ? 'border-red-500 focus:border-red-400'
+                          : 'border-gray-600 focus:border-orange-400'
+                      } focus:outline-none focus:ring-2 focus:ring-orange-500/20`}
                       placeholder="Enter phone number"
                     />
                     {errors.contact_number && (
-                      <p className="mt-1 text-sm text-red-600">{errors.contact_number}</p>
+                      <p className="mt-1 text-sm text-red-400">{errors.contact_number}</p>
                     )}
                   </div>
 
                   <div>
-                    <label htmlFor="id_number" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="id_number" className="block text-sm font-medium text-gray-300 mb-2">
                       ID Number (Optional)
                     </label>
                     <input
@@ -606,21 +663,21 @@ function App() {
                       name="id_number"
                       value={formData.id_number}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 ${
+                      className={`w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
                         errors.id_number
-                          ? 'border-red-300 focus:border-red-500'
-                          : 'border-gray-200 focus:border-orange-400'
-                      } focus:outline-none focus:ring-2 focus:ring-orange-100`}
+                          ? 'border-red-500 focus:border-red-400'
+                          : 'border-gray-600 focus:border-orange-400'
+                      } focus:outline-none focus:ring-2 focus:ring-orange-500/20`}
                       placeholder="Enter ID number"
                     />
                     {errors.id_number && (
-                      <p className="mt-1 text-sm text-red-600">{errors.id_number}</p>
+                      <p className="mt-1 text-sm text-red-400">{errors.id_number}</p>
                     )}
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="agent_name" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="agent_name" className="block text-sm font-medium text-gray-300 mb-2">
                     Agent Name *
                   </label>
                   <input
@@ -629,22 +686,22 @@ function App() {
                     name="agent_name"
                     value={formData.agent_name}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 ${
+                    className={`w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
                       errors.agent_name
-                        ? 'border-red-300 focus:border-red-500'
-                        : 'border-gray-200 focus:border-orange-400'
-                    } focus:outline-none focus:ring-2 focus:ring-orange-100`}
+                        ? 'border-red-500 focus:border-red-400'
+                        : 'border-gray-600 focus:border-orange-400'
+                    } focus:outline-none focus:ring-2 focus:ring-orange-500/20`}
                     placeholder="Enter agent name"
                   />
                   {errors.agent_name && (
-                    <p className="mt-1 text-sm text-red-600">{errors.agent_name}</p>
+                    <p className="mt-1 text-sm text-red-400">{errors.agent_name}</p>
                   )}
                 </div>
 
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 disabled:from-gray-300 disabled:to-gray-400 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl"
+                  className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl"
                 >
                   {isSubmitting ? (
                     <>
@@ -663,26 +720,26 @@ function App() {
           ) : (
             <div className="p-8">
               <div className="text-center mb-8">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-green-100 to-blue-100 rounded-full mb-4">
-                  <Calculator className="h-8 w-8 text-green-600" />
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-green-600 rounded-full mb-4">
+                  <Calculator className="h-8 w-8 text-white" />
                 </div>
-                <h2 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-2">
+                <h2 className="text-3xl font-bold text-green-400 mb-2">
                   Quick Quote
                 </h2>
-                <p className="text-gray-600">Get a comprehensive vehicle insurance quote</p>
+                <p className="text-gray-400">Get a comprehensive vehicle insurance quote</p>
               </div>
 
               <form onSubmit={handleQuickQuoteSubmit} className="space-y-8">
                 {/* Vehicle Information */}
-                <div className="bg-gradient-to-r from-green-50 to-blue-50 p-6 rounded-xl">
-                  <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                    <Car className="h-5 w-5 mr-2 text-green-600" />
+                <div className="bg-green-900/30 p-6 rounded-xl border border-green-700">
+                  <h3 className="text-xl font-semibold text-green-400 mb-4 flex items-center">
+                    <Car className="h-5 w-5 mr-2" />
                     Vehicle Information
                   </h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Year *</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Year *</label>
                       <input
                         type="number"
                         name="year"
@@ -690,57 +747,57 @@ function App() {
                         onChange={handleInputChange}
                         min="1990"
                         max={new Date().getFullYear() + 1}
-                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-100"
+                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-600 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 bg-gray-700 text-white"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Make *</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Make *</label>
                       <input
                         type="text"
                         name="make"
                         value={quickQuoteData.make}
                         onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 ${
-                          errors.make ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-green-400'
-                        } focus:outline-none focus:ring-2 focus:ring-green-100`}
+                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
+                          errors.make ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-green-400'
+                        } focus:outline-none focus:ring-2 focus:ring-green-500/20`}
                         placeholder="e.g., Volkswagen"
                       />
-                      {errors.make && <p className="mt-1 text-sm text-red-600">{errors.make}</p>}
+                      {errors.make && <p className="mt-1 text-sm text-red-400">{errors.make}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Model *</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Model *</label>
                       <input
                         type="text"
                         name="model"
                         value={quickQuoteData.model}
                         onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 ${
-                          errors.model ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-green-400'
-                        } focus:outline-none focus:ring-2 focus:ring-green-100`}
+                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
+                          errors.model ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-green-400'
+                        } focus:outline-none focus:ring-2 focus:ring-green-500/20`}
                         placeholder="e.g., Polo TSI 1.2 Comfortline"
                       />
-                      {errors.model && <p className="mt-1 text-sm text-red-600">{errors.model}</p>}
+                      {errors.model && <p className="mt-1 text-sm text-red-400">{errors.model}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Colour *</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Colour *</label>
                       <input
                         type="text"
                         name="colour"
                         value={quickQuoteData.colour}
                         onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 ${
-                          errors.colour ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-green-400'
-                        } focus:outline-none focus:ring-2 focus:ring-green-100`}
+                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
+                          errors.colour ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-green-400'
+                        } focus:outline-none focus:ring-2 focus:ring-green-500/20`}
                         placeholder="e.g., White"
                       />
-                      {errors.colour && <p className="mt-1 text-sm text-red-600">{errors.colour}</p>}
+                      {errors.colour && <p className="mt-1 text-sm text-red-400">{errors.colour}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Engine Size (L)</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Engine Size (L)</label>
                       <input
                         type="number"
                         name="engineSize"
@@ -749,59 +806,59 @@ function App() {
                         step="0.1"
                         min="0.1"
                         max="10"
-                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-100"
+                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-600 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 bg-gray-700 text-white"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">MM Code</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">MM Code</label>
                       <input
                         type="text"
                         name="mmCode"
                         value={quickQuoteData.mmCode}
                         onChange={handleInputChange}
-                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-100"
+                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-600 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 bg-gray-700 text-white"
                         placeholder="Optional"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Retail Value (R) *</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Retail Value (R) *</label>
                       <input
                         type="number"
                         name="retailValue"
                         value={quickQuoteData.retailValue}
                         onChange={handleInputChange}
                         min="0"
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 ${
-                          errors.retailValue ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-green-400'
-                        } focus:outline-none focus:ring-2 focus:ring-green-100`}
+                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
+                          errors.retailValue ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-green-400'
+                        } focus:outline-none focus:ring-2 focus:ring-green-500/20`}
                       />
-                      {errors.retailValue && <p className="mt-1 text-sm text-red-600">{errors.retailValue}</p>}
+                      {errors.retailValue && <p className="mt-1 text-sm text-red-400">{errors.retailValue}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Market Value (R) *</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Market Value (R) *</label>
                       <input
                         type="number"
                         name="marketValue"
                         value={quickQuoteData.marketValue}
                         onChange={handleInputChange}
                         min="0"
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 ${
-                          errors.marketValue ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-green-400'
-                        } focus:outline-none focus:ring-2 focus:ring-green-100`}
+                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
+                          errors.marketValue ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-green-400'
+                        } focus:outline-none focus:ring-2 focus:ring-green-500/20`}
                       />
-                      {errors.marketValue && <p className="mt-1 text-sm text-red-600">{errors.marketValue}</p>}
+                      {errors.marketValue && <p className="mt-1 text-sm text-red-400">{errors.marketValue}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Cover Type</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Cover Type</label>
                       <select
                         name="coverCode"
                         value={quickQuoteData.coverCode}
                         onChange={handleInputChange}
-                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-100"
+                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-600 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 bg-gray-700 text-white"
                       >
                         <option value="Comprehensive">Comprehensive</option>
                         <option value="Third Party">Third Party</option>
@@ -812,142 +869,140 @@ function App() {
                 </div>
 
                 {/* Address Information */}
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-xl">
-                  <h3 className="text-xl font-semibold text-gray-800 mb-4">Address Information</h3>
+                <div className="bg-blue-900/30 p-6 rounded-xl border border-blue-700">
+                  <h3 className="text-xl font-semibold text-blue-400 mb-4">Address Information</h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Address Line *</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Address Line *</label>
                       <input
                         type="text"
                         name="addressLine"
                         value={quickQuoteData.addressLine}
                         onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 ${
-                          errors.addressLine ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-blue-400'
-                        } focus:outline-none focus:ring-2 focus:ring-blue-100`}
+                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
+                          errors.addressLine ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-blue-400'
+                        } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
                         placeholder="123 Main Street"
                       />
-                      {errors.addressLine && <p className="mt-1 text-sm text-red-600">{errors.addressLine}</p>}
+                      {errors.addressLine && <p className="mt-1 text-sm text-red-400">{errors.addressLine}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Suburb *</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Suburb *</label>
                       <input
                         type="text"
                         name="suburb"
                         value={quickQuoteData.suburb}
                         onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 ${
-                          errors.suburb ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-blue-400'
-                        } focus:outline-none focus:ring-2 focus:ring-blue-100`}
+                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
+                          errors.suburb ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-blue-400'
+                        } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
                         placeholder="Sandton"
                       />
-                      {errors.suburb && <p className="mt-1 text-sm text-red-600">{errors.suburb}</p>}
+                      {errors.suburb && <p className="mt-1 text-sm text-red-400">{errors.suburb}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Postal Code *</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Postal Code *</label>
                       <input
                         type="text"
                         name="postalCode"
                         value={quickQuoteData.postalCode}
                         onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 ${
-                          errors.postalCode ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-blue-400'
-                        } focus:outline-none focus:ring-2 focus:ring-blue-100`}
+                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
+                          errors.postalCode ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-blue-400'
+                        } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
                         placeholder="2196"
                       />
-                      {errors.postalCode && <p className="mt-1 text-sm text-red-600">{errors.postalCode}</p>}
+                      {errors.postalCode && <p className="mt-1 text-sm text-red-400">{errors.postalCode}</p>}
                     </div>
                   </div>
                 </div>
 
                 {/* Driver Information */}
-                <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-xl">
-                  <h3 className="text-xl font-semibold text-gray-800 mb-4">Driver Information</h3>
+                <div className="bg-purple-900/30 p-6 rounded-xl border border-purple-700">
+                  <h3 className="text-xl font-semibold text-purple-400 mb-4">Driver Information</h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Email Address *</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Email Address *</label>
                       <input
                         type="email"
                         name="emailAddress"
                         value={quickQuoteData.emailAddress}
                         onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 ${
-                          errors.emailAddress ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-purple-400'
-                        } focus:outline-none focus:ring-2 focus:ring-purple-100`}
+                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
+                          errors.emailAddress ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-purple-400'
+                        } focus:outline-none focus:ring-2 focus:ring-purple-500/20`}
                         placeholder="example@gmail.com"
                       />
-                      {errors.emailAddress && <p className="mt-1 text-sm text-red-600">{errors.emailAddress}</p>}
+                      {errors.emailAddress && <p className="mt-1 text-sm text-red-400">{errors.emailAddress}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Mobile Number *</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Mobile Number *</label>
                       <input
                         type="tel"
                         name="mobileNumber"
                         value={quickQuoteData.mobileNumber}
                         onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 ${
-                          errors.mobileNumber ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-purple-400'
-                        } focus:outline-none focus:ring-2 focus:ring-purple-100`}
+                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
+                          errors.mobileNumber ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-purple-400'
+                        } focus:outline-none focus:ring-2 focus:ring-purple-500/20`}
                         placeholder="0821234567"
                       />
-                      {errors.mobileNumber && <p className="mt-1 text-sm text-red-600">{errors.mobileNumber}</p>}
+                      {errors.mobileNumber && <p className="mt-1 text-sm text-red-400">{errors.mobileNumber}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">ID Number *</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">ID Number *</label>
                       <input
                         type="text"
                         name="idNumber"
                         value={quickQuoteData.idNumber}
                         onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 ${
-                          errors.idNumber ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-purple-400'
-                        } focus:outline-none focus:ring-2 focus:ring-purple-100`}
+                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
+                          errors.idNumber ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-purple-400'
+                        } focus:outline-none focus:ring-2 focus:ring-purple-500/20`}
                         placeholder="9404054800086"
                       />
-                      {errors.idNumber && <p className="mt-1 text-sm text-red-600">{errors.idNumber}</p>}
+                      {errors.idNumber && <p className="mt-1 text-sm text-red-400">{errors.idNumber}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Date of Birth *</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Date of Birth (Auto-filled from ID)</label>
                       <input
                         type="date"
                         name="dateOfBirth"
                         value={quickQuoteData.dateOfBirth}
                         onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 ${
-                          errors.dateOfBirth ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-purple-400'
-                        } focus:outline-none focus:ring-2 focus:ring-purple-100`}
+                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-600 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 bg-gray-700 text-white"
+                        readOnly
                       />
-                      {errors.dateOfBirth && <p className="mt-1 text-sm text-red-600">{errors.dateOfBirth}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">License Issue Date *</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">License Issue Date *</label>
                       <input
                         type="date"
                         name="licenseIssueDate"
                         value={quickQuoteData.licenseIssueDate}
                         onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 ${
-                          errors.licenseIssueDate ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-purple-400'
-                        } focus:outline-none focus:ring-2 focus:ring-purple-100`}
+                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
+                          errors.licenseIssueDate ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-purple-400'
+                        } focus:outline-none focus:ring-2 focus:ring-purple-500/20`}
                       />
-                      {errors.licenseIssueDate && <p className="mt-1 text-sm text-red-600">{errors.licenseIssueDate}</p>}
+                      {errors.licenseIssueDate && <p className="mt-1 text-sm text-red-400">{errors.licenseIssueDate}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Marital Status</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Marital Status</label>
                       <select
                         name="maritalStatus"
                         value={quickQuoteData.maritalStatus}
                         onChange={handleInputChange}
-                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100"
+                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-600 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 bg-gray-700 text-white"
                       >
                         <option value="Single">Single</option>
                         <option value="Married">Married</option>
@@ -957,7 +1012,7 @@ function App() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Years Without Claims</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Years Without Claims</label>
                       <input
                         type="number"
                         name="yearsWithoutClaims"
@@ -965,19 +1020,18 @@ function App() {
                         onChange={handleInputChange}
                         min="0"
                         max="50"
-                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100"
+                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-600 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 bg-gray-700 text-white"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">External Reference ID</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">External Reference ID (Auto-generated)</label>
                       <input
                         type="text"
                         name="externalReferenceId"
                         value={quickQuoteData.externalReferenceId}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100"
-                        placeholder="Optional reference ID"
+                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-600 bg-gray-700 text-gray-400"
+                        readOnly
                       />
                     </div>
                   </div>
@@ -986,7 +1040,7 @@ function App() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 disabled:from-gray-300 disabled:to-gray-400 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl"
+                  className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl"
                 >
                   {isSubmitting ? (
                     <>
@@ -1007,13 +1061,13 @@ function App() {
           {/* Status Messages */}
           {submitStatus === 'success' && (
             <div className="mx-8 mb-8">
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-lg border-2 border-green-200">
-                <div className="flex items-center space-x-2 text-green-700 mb-4">
+              <div className="bg-green-900/50 p-6 rounded-lg border-2 border-green-600">
+                <div className="flex items-center space-x-2 text-green-400 mb-4">
                   <CheckCircle className="h-6 w-6" />
                   <span className="text-lg font-semibold">Success!</span>
                 </div>
                 {apiResponse && (
-                  <div className="text-gray-700">
+                  <div className="text-gray-300">
                     {activeTab === 'transfer' && apiResponse.data && (
                       <>
                         <div className="mb-4">
@@ -1024,7 +1078,7 @@ function App() {
                             href={apiResponse.data.redirect_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-block bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+                            className="inline-block bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
                           >
                             Continue to Your Lead
                           </a>
@@ -1033,13 +1087,46 @@ function App() {
                     )}
                     {activeTab === 'quote' && (
                       <div>
-                        <p className="mb-4">Your quote has been generated successfully!</p>
-                        <details className="mt-4">
-                          <summary className="cursor-pointer text-green-700 font-medium">View Quote Details</summary>
-                          <pre className="mt-2 text-xs bg-green-100 p-4 rounded overflow-auto">
-                            {JSON.stringify(apiResponse, null, 2)}
-                          </pre>
-                        </details>
+                        {apiResponse.success && apiResponse.data && Array.isArray(apiResponse.data) && apiResponse.data.length > 0 ? (
+                          <div className="space-y-4">
+                            <p className="mb-4 text-green-400 font-semibold">Your quote has been generated successfully!</p>
+                            {apiResponse.data.map((quote: QuoteResult, index: number) => (
+                              <div key={index} className="bg-gray-800 p-6 rounded-lg border border-green-600">
+                                <h4 className="text-xl font-bold text-green-400 mb-4">Quote Details</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                  <div className="bg-green-900/30 p-4 rounded-lg border border-green-700">
+                                    <div className="flex items-center space-x-2 mb-2">
+                                      <DollarSign className="h-5 w-5 text-green-400" />
+                                      <span className="text-sm font-medium text-gray-300">Monthly Premium</span>
+                                    </div>
+                                    <div className="text-2xl font-bold text-green-400">
+                                      {formatCurrency(quote.premium)}
+                                    </div>
+                                  </div>
+                                  <div className="bg-orange-900/30 p-4 rounded-lg border border-orange-700">
+                                    <div className="flex items-center space-x-2 mb-2">
+                                      <Shield className="h-5 w-5 text-orange-400" />
+                                      <span className="text-sm font-medium text-gray-300">Excess Amount</span>
+                                    </div>
+                                    <div className="text-2xl font-bold text-orange-400">
+                                      {formatCurrency(quote.excess)}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="mb-4">Your quote request has been processed successfully!</p>
+                            <details className="mt-4">
+                              <summary className="cursor-pointer text-green-400 font-medium">View Quote Details</summary>
+                              <pre className="mt-2 text-xs bg-gray-900 p-4 rounded overflow-auto border border-green-700">
+                                {JSON.stringify(apiResponse, null, 2)}
+                              </pre>
+                            </details>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1050,12 +1137,12 @@ function App() {
           
           {submitStatus === 'error' && (
             <div className="mx-8 mb-8">
-              <div className="bg-gradient-to-r from-red-50 to-pink-50 p-6 rounded-lg border-2 border-red-200">
-                <div className="flex items-center space-x-2 text-red-600 mb-2">
+              <div className="bg-red-900/50 p-6 rounded-lg border-2 border-red-600">
+                <div className="flex items-center space-x-2 text-red-400 mb-2">
                   <AlertCircle className="h-5 w-5" />
                   <span className="font-semibold">Error occurred</span>
                 </div>
-                <p className="text-red-700 mb-4">{getUserFriendlyErrorMessage(apiResponse)}</p>
+                <p className="text-red-300 mb-4">{getUserFriendlyErrorMessage(apiResponse)}</p>
                 
                 {apiResponse && 
                  typeof apiResponse === 'object' && 
@@ -1065,7 +1152,7 @@ function App() {
                   <div className="mb-4">
                     <button
                       onClick={() => window.open('mailto:support@quicksave.co.za?subject=Existing Quote Request&body=I need help with my existing quote request for phone number: ' + (activeTab === 'transfer' ? formData.contact_number : quickQuoteData.mobileNumber), '_blank')}
-                      className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
                     >
                       Contact Support
                     </button>
@@ -1074,8 +1161,8 @@ function App() {
                 
                 {apiResponse && (
                   <details className="mt-4">
-                    <summary className="cursor-pointer text-red-600 font-medium">View Technical Details</summary>
-                    <pre className="mt-2 text-xs bg-red-100 p-2 rounded overflow-auto">
+                    <summary className="cursor-pointer text-red-400 font-medium">View Technical Details</summary>
+                    <pre className="mt-2 text-xs bg-gray-900 p-2 rounded overflow-auto border border-red-700">
                       {typeof apiResponse === "string" ? apiResponse : JSON.stringify(apiResponse, null, 2)}
                     </pre>
                   </details>
@@ -1087,28 +1174,28 @@ function App() {
 
         {/* Benefits Section */}
         <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="text-center p-6 bg-white rounded-xl shadow-lg border-2 border-orange-100 hover:shadow-xl transition-all duration-300">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-r from-orange-100 to-yellow-100 rounded-lg mb-4">
-              <Shield className="h-6 w-6 text-orange-600" />
+          <div className="text-center p-6 bg-gray-800 rounded-xl shadow-lg border-2 border-orange-600 hover:shadow-xl transition-all duration-300">
+            <div className="inline-flex items-center justify-center w-12 h-12 bg-orange-600 rounded-lg mb-4">
+              <Shield className="h-6 w-6 text-white" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Comprehensive Coverage</h3>
-            <p className="text-gray-600">Protection for your vehicle and peace of mind</p>
+            <h3 className="text-lg font-semibold text-orange-400 mb-2">Comprehensive Coverage</h3>
+            <p className="text-gray-400">Protection for your vehicle and peace of mind</p>
           </div>
           
-          <div className="text-center p-6 bg-white rounded-xl shadow-lg border-2 border-green-100 hover:shadow-xl transition-all duration-300">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-r from-green-100 to-emerald-100 rounded-lg mb-4">
-              <DollarSign className="h-6 w-6 text-green-600" />
+          <div className="text-center p-6 bg-gray-800 rounded-xl shadow-lg border-2 border-green-600 hover:shadow-xl transition-all duration-300">
+            <div className="inline-flex items-center justify-center w-12 h-12 bg-green-600 rounded-lg mb-4">
+              <DollarSign className="h-6 w-6 text-white" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Best Prices</h3>
-            <p className="text-gray-600">Compare quotes from top insurers instantly</p>
+            <h3 className="text-lg font-semibold text-green-400 mb-2">Best Prices</h3>
+            <p className="text-gray-400">Compare quotes from top insurers instantly</p>
           </div>
           
-          <div className="text-center p-6 bg-white rounded-xl shadow-lg border-2 border-blue-100 hover:shadow-xl transition-all duration-300">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-lg mb-4">
-              <CheckCircle className="h-6 w-6 text-blue-600" />
+          <div className="text-center p-6 bg-gray-800 rounded-xl shadow-lg border-2 border-blue-600 hover:shadow-xl transition-all duration-300">
+            <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-600 rounded-lg mb-4">
+              <CheckCircle className="h-6 w-6 text-white" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Quick Process</h3>
-            <p className="text-gray-600">Get your quote in under 5 minutes</p>
+            <h3 className="text-lg font-semibold text-blue-400 mb-2">Quick Process</h3>
+            <p className="text-gray-400">Get your quote in under 5 minutes</p>
           </div>
         </div>
       </div>

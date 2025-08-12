@@ -1,1201 +1,925 @@
-import React, { useState, useEffect } from 'react';
-import { Car, Shield, DollarSign, CheckCircle, AlertCircle, Loader2, Send, Calculator } from 'lucide-react';
+import React, { useState } from 'react';
+import { Car, User, Phone, Mail, CreditCard, Send, UserCheck } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
-interface FormData {
-  first_name: string;
-  last_name: string;
-  email: string;
-  id_number: string;
-  contact_number: string;
-  agent_name: string;
-}
-
-interface QuickQuoteFormData {
-  source: string;
-  externalReferenceId: string;
-  year: number;
+interface VehicleData {
   make: string;
   model: string;
-  mmCode: string;
-  modified: string;
-  category: string;
-  colour: string;
-  engineSize: number;
-  financed: string;
-  owner: string;
-  status: string;
-  partyIsRegularDriver: string;
-  accessories: string;
-  accessoriesAmount: number;
-  retailValue: number;
-  marketValue: number;
-  insuredValueType: string;
-  useType: string;
-  overnightParkingSituation: string;
-  coverCode: string;
-  addressLine: string;
-  postalCode: string;
-  suburb: string;
-  latitude: number;
-  longitude: number;
-  maritalStatus: string;
-  currentlyInsured: boolean;
-  yearsWithoutClaims: number;
-  relationToPolicyHolder: string;
-  emailAddress: string;
-  mobileNumber: string;
+  year: string;
+  engineSize: string;
+  fuelType: string;
+  transmission: string;
+  vehicleType: string;
+  vehicleUse: string;
+  parkingLocation: string;
+  securityFeatures: string[];
+  modifications: string;
+  estimatedValue: string;
+}
+
+interface DriverData {
+  firstName: string;
+  lastName: string;
+  agentName: string;
+  age: string;
+  licenseType: string;
+  yearsLicensed: string;
+  previousClaims: string;
+  criminalRecord: string;
+}
+
+interface ContactData {
+  email: string;
+  phone: string;
   idNumber: string;
-  prvInsLosses: number;
-  licenseIssueDate: string;
-  dateOfBirth: string;
 }
 
-interface FormErrors {
-  [key: string]: string;
+interface CoverageData {
+  coverType: string;
+  excess: string;
+  additionalCover: string[];
 }
 
-interface QuoteResult {
-  premium: number;
-  excess: number;
+interface QuoteResponse {
+  success: boolean;
+  data?: {
+    quoteId?: string;
+    premium?: number;
+    redirect_url?: string;
+  };
+  error?: string;
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'transfer' | 'quote'>('transfer');
-  
-  const [formData, setFormData] = useState<FormData>({
-    first_name: '',
-    last_name: '',
-    email: '',
-    id_number: '',
-    contact_number: '',
-    agent_name: '',
-  });
+  const [activeTab, setActiveTab] = useState('vehicle');
+  const [isLoading, setIsLoading] = useState(false);
+  const [quoteResult, setQuoteResult] = useState<QuoteResponse | null>(null);
+  const [showLeadTransfer, setShowLeadTransfer] = useState(false);
+  const [isTransferring, setIsTransferring] = useState(false);
 
-  const [quickQuoteData, setQuickQuoteData] = useState<QuickQuoteFormData>({
-    source: 'KodomBranchOne',
-    externalReferenceId: '',
-    year: new Date().getFullYear(),
+  const [vehicleData, setVehicleData] = useState<VehicleData>({
     make: '',
     model: '',
-    mmCode: '',
-    modified: 'N',
-    category: 'HB',
-    colour: '',
-    engineSize: 1.0,
-    financed: 'N',
-    owner: 'Y',
-    status: 'New',
-    partyIsRegularDriver: 'Y',
-    accessories: 'N',
-    accessoriesAmount: 0,
-    retailValue: 0,
-    marketValue: 0,
-    insuredValueType: 'Retail',
-    useType: 'Private',
-    overnightParkingSituation: 'Garage',
-    coverCode: 'Comprehensive',
-    addressLine: '',
-    postalCode: '',
-    suburb: '',
-    latitude: 0,
-    longitude: 0,
-    maritalStatus: 'Single',
-    currentlyInsured: false,
-    yearsWithoutClaims: 0,
-    relationToPolicyHolder: 'Self',
-    emailAddress: '',
-    mobileNumber: '',
-    idNumber: '',
-    prvInsLosses: 0,
-    licenseIssueDate: '',
-    dateOfBirth: '',
+    year: '',
+    engineSize: '',
+    fuelType: '',
+    transmission: '',
+    vehicleType: '',
+    vehicleUse: '',
+    parkingLocation: '',
+    securityFeatures: [],
+    modifications: '',
+    estimatedValue: ''
   });
-  
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [apiResponse, setApiResponse] = useState<any>(null);
 
-  // Generate external reference ID on component mount
-  useEffect(() => {
-    const generateExternalRefId = () => {
-      return Date.now().toString() + Math.random().toString(36).substr(2, 5);
-    };
-    
-    setQuickQuoteData(prev => ({
+  const [driverData, setDriverData] = useState<DriverData>({
+    firstName: '',
+    lastName: '',
+    agentName: '',
+    age: '',
+    licenseType: '',
+    yearsLicensed: '',
+    previousClaims: '',
+    criminalRecord: ''
+  });
+
+  const [contactData, setContactData] = useState<ContactData>({
+    email: '',
+    phone: '',
+    idNumber: ''
+  });
+
+  const [coverageData, setCoverageData] = useState<CoverageData>({
+    coverType: '',
+    excess: '',
+    additionalCover: []
+  });
+
+  const [leadTransferData, setLeadTransferData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    contactNumber: '',
+    idNumber: '',
+    agentName: '',
+    source: 'Kodom_Connect',
+    metaData: {}
+  });
+
+  // Auto-populate lead transfer data when driver/contact data changes
+  React.useEffect(() => {
+    setLeadTransferData(prev => ({
       ...prev,
-      externalReferenceId: generateExternalRefId()
+      firstName: driverData.firstName,
+      lastName: driverData.lastName,
+      agentName: driverData.agentName,
+      email: contactData.email,
+      contactNumber: contactData.phone,
+      idNumber: contactData.idNumber
     }));
-  }, []);
+  }, [driverData.firstName, driverData.lastName, driverData.agentName, contactData.email, contactData.phone, contactData.idNumber]);
 
-  // Function to extract date of birth from South African ID number
-  const extractDateOfBirthFromId = (idNumber: string): string => {
-    if (idNumber.length !== 13) return '';
-    
-    const year = idNumber.substring(0, 2);
-    const month = idNumber.substring(2, 4);
-    const day = idNumber.substring(4, 6);
-    
-    // Determine century (assuming current year is 2024)
-    const currentYear = new Date().getFullYear();
-    const currentCentury = Math.floor(currentYear / 100);
-    const yearNum = parseInt(year);
-    
-    let fullYear;
-    if (yearNum <= (currentYear % 100)) {
-      fullYear = currentCentury * 100 + yearNum;
-    } else {
-      fullYear = (currentCentury - 1) * 100 + yearNum;
-    }
-    
-    return `${fullYear}-${month}-${day}`;
+  const handleSecurityFeatureChange = (feature: string, checked: boolean) => {
+    setVehicleData(prev => ({
+      ...prev,
+      securityFeatures: checked
+        ? [...prev.securityFeatures, feature]
+        : prev.securityFeatures.filter(f => f !== feature)
+    }));
   };
 
-  const validateTransferForm = (): boolean => {
-    const newErrors: FormErrors = {};
-    
-    if (!formData.first_name.trim()) {
-      newErrors.first_name = 'First name is required';
-    }
-    
-    if (!formData.last_name.trim()) {
-      newErrors.last_name = 'Last name is required';
-    }
-    
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-    
-    if (!formData.contact_number.trim()) {
-      newErrors.contact_number = 'Contact number is required';
-    } else if (!/^[0-9]{10}$/.test(formData.contact_number.replace(/\s+/g, ''))) {
-      newErrors.contact_number = 'Please enter a valid 10-digit phone number';
-    }
-    
-    if (formData.id_number && !/^[0-9]{13}$/.test(formData.id_number)) {
-      newErrors.id_number = 'ID number must be 13 digits';
-    }
-    
-    if (!formData.agent_name.trim()) {
-      newErrors.agent_name = 'Agent name is required';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const handleAdditionalCoverChange = (cover: string, checked: boolean) => {
+    setCoverageData(prev => ({
+      ...prev,
+      additionalCover: checked
+        ? [...prev.additionalCover, cover]
+        : prev.additionalCover.filter(c => c !== cover)
+    }));
   };
 
-  const validateQuickQuoteForm = (): boolean => {
-    const newErrors: FormErrors = {};
-    
-    if (!quickQuoteData.make.trim()) {
-      newErrors.make = 'Vehicle make is required';
-    }
-    
-    if (!quickQuoteData.model.trim()) {
-      newErrors.model = 'Vehicle model is required';
-    }
-    
-    if (!quickQuoteData.colour.trim()) {
-      newErrors.colour = 'Vehicle colour is required';
-    }
-    
-    if (quickQuoteData.retailValue <= 0) {
-      newErrors.retailValue = 'Retail value must be greater than 0';
-    }
-    
-    if (quickQuoteData.marketValue <= 0) {
-      newErrors.marketValue = 'Market value must be greater than 0';
-    }
-    
-    if (!quickQuoteData.addressLine.trim()) {
-      newErrors.addressLine = 'Address is required';
-    }
-    
-    if (!quickQuoteData.postalCode.trim()) {
-      newErrors.postalCode = 'Postal code is required';
-    }
-    
-    if (!quickQuoteData.suburb.trim()) {
-      newErrors.suburb = 'Suburb is required';
-    }
-    
-    if (!quickQuoteData.emailAddress.trim()) {
-      newErrors.emailAddress = 'Email address is required';
-    } else if (!/\S+@\S+\.\S+/.test(quickQuoteData.emailAddress)) {
-      newErrors.emailAddress = 'Please enter a valid email address';
-    }
-    
-    if (!quickQuoteData.mobileNumber.trim()) {
-      newErrors.mobileNumber = 'Mobile number is required';
-    }
-    
-    if (!quickQuoteData.idNumber.trim()) {
-      newErrors.idNumber = 'ID number is required';
-    } else if (!/^[0-9]{13}$/.test(quickQuoteData.idNumber)) {
-      newErrors.idNumber = 'ID number must be 13 digits';
-    }
-    
-    if (!quickQuoteData.licenseIssueDate) {
-      newErrors.licenseIssueDate = 'License issue date is required';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  const handleQuoteSubmit = async () => {
+    setIsLoading(true);
+    setQuoteResult(null);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    const finalValue = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
-    
-    if (activeTab === 'transfer') {
-      setFormData(prev => ({ ...prev, [name]: finalValue }));
-    } else {
-      setQuickQuoteData(prev => {
-        const newData = { ...prev, [name]: finalValue };
-        
-        // Auto-extract date of birth from ID number
-        if (name === 'idNumber' && typeof finalValue === 'string' && finalValue.length === 13) {
-          const extractedDate = extractDateOfBirthFromId(finalValue);
-          if (extractedDate) {
-            newData.dateOfBirth = extractedDate;
-          }
-        }
-        
-        return newData;
-      });
-    }
-    
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
-  };
-
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('en-ZA', {
-      style: 'currency',
-      currency: 'ZAR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  };
-
-  const handleTransferSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateTransferForm()) return;
-    
-    setIsSubmitting(true);
-    setSubmitStatus('idle');
-    setApiResponse(null);
-    
     try {
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/motor-lead`;
-      
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+      const quotePayload = {
+        source: "KodomBranchOne",
+        externalReferenceId: `QUOTE_${Date.now()}`,
+        vehicles: [{
+          make: vehicleData.make,
+          model: vehicleData.model,
+          year: parseInt(vehicleData.year),
+          engineSize: vehicleData.engineSize,
+          fuelType: vehicleData.fuelType,
+          transmission: vehicleData.transmission,
+          vehicleType: vehicleData.vehicleType,
+          vehicleUse: vehicleData.vehicleUse,
+          parkingLocation: vehicleData.parkingLocation,
+          securityFeatures: vehicleData.securityFeatures,
+          modifications: vehicleData.modifications,
+          estimatedValue: parseFloat(vehicleData.estimatedValue) || 0
+        }],
+        driver: {
+          firstName: driverData.firstName,
+          lastName: driverData.lastName,
+          age: parseInt(driverData.age),
+          licenseType: driverData.licenseType,
+          yearsLicensed: parseInt(driverData.yearsLicensed),
+          previousClaims: driverData.previousClaims,
+          criminalRecord: driverData.criminalRecord === 'yes'
         },
-        body: JSON.stringify({
-          source: 'KodomBranchOne',
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          email: formData.email,
-          id_number: formData.id_number || '',
-          meta_data: {},
-          contact_number: formData.contact_number,
-          agent_name: formData.agent_name,
-        }),
-      });
-      
-      let data;
-      const contentType = response.headers.get("content-type");
-      if (contentType && contentType.indexOf("application/json") !== -1) {
-        data = await response.json();
-      } else {
-        data = await response.text();
-        try {
-          data = JSON.parse(data);
-        } catch {}
-      }
-
-      const isSuccess = (
-        (typeof data === "object" &&
-          data.success === true &&
-          data.data &&
-          data.data.redirect_url) ||
-        (typeof data === "string" && data.includes("redirect_url"))
-      );
-
-      if (isSuccess) {
-        if (typeof data === "string") {
-          try {
-            data = JSON.parse(data);
-          } catch {}
+        contact: {
+          email: contactData.email,
+          phone: contactData.phone,
+          idNumber: contactData.idNumber
+        },
+        coverage: {
+          coverType: coverageData.coverType,
+          excess: parseFloat(coverageData.excess) || 0,
+          additionalCover: coverageData.additionalCover
         }
-        
-        setSubmitStatus('success');
-        setApiResponse(data);
-        setFormData({
-          first_name: '',
-          last_name: '',
-          email: '',
-          id_number: '',
-          contact_number: '',
-          agent_name: '',
-        });
-      } else {
-        setApiResponse(data);
-        console.error('API Response:', data);
-        throw new Error('Failed to submit form');
-      }
-    } catch (error) {
-      setSubmitStatus('error');
-      console.error('Error submitting form:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleQuickQuoteSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateQuickQuoteForm()) return;
-    
-    setIsSubmitting(true);
-    setSubmitStatus('idle');
-    setApiResponse(null);
-    
-    try {
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quick-quote`;
-      
-      const requestBody = {
-        source: quickQuoteData.source,
-        externalReferenceId: quickQuoteData.externalReferenceId,
-        vehicles: [
-          {
-            year: quickQuoteData.year,
-            make: quickQuoteData.make,
-            model: quickQuoteData.model,
-            mmCode: quickQuoteData.mmCode,
-            modified: quickQuoteData.modified,
-            category: quickQuoteData.category,
-            colour: quickQuoteData.colour,
-            engineSize: quickQuoteData.engineSize,
-            financed: quickQuoteData.financed,
-            owner: quickQuoteData.owner,
-            status: quickQuoteData.status,
-            partyIsRegularDriver: quickQuoteData.partyIsRegularDriver,
-            accessories: quickQuoteData.accessories,
-            accessoriesAmount: quickQuoteData.accessoriesAmount,
-            retailValue: quickQuoteData.retailValue,
-            marketValue: quickQuoteData.marketValue,
-            insuredValueType: quickQuoteData.insuredValueType,
-            useType: quickQuoteData.useType,
-            overnightParkingSituation: quickQuoteData.overnightParkingSituation,
-            coverCode: quickQuoteData.coverCode,
-            address: {
-              addressLine: quickQuoteData.addressLine,
-              postalCode: parseInt(quickQuoteData.postalCode),
-              suburb: quickQuoteData.suburb,
-              latitude: quickQuoteData.latitude,
-              longitude: quickQuoteData.longitude
-            },
-            regularDriver: {
-              maritalStatus: quickQuoteData.maritalStatus,
-              currentlyInsured: quickQuoteData.currentlyInsured,
-              yearsWithoutClaims: quickQuoteData.yearsWithoutClaims,
-              relationToPolicyHolder: quickQuoteData.relationToPolicyHolder,
-              emailAddress: quickQuoteData.emailAddress,
-              mobileNumber: quickQuoteData.mobileNumber,
-              idNumber: quickQuoteData.idNumber,
-              prvInsLosses: quickQuoteData.prvInsLosses,
-              licenseIssueDate: quickQuoteData.licenseIssueDate,
-              dateOfBirth: quickQuoteData.dateOfBirth
-            }
-          }
-        ]
       };
-      
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quick-quote`;
+      const headers = {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      };
+
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify(requestBody),
+        headers,
+        body: JSON.stringify(quotePayload)
       });
-      
-      let data;
-      const contentType = response.headers.get("content-type");
-      if (contentType && contentType.indexOf("application/json") !== -1) {
-        data = await response.json();
-      } else {
-        data = await response.text();
-        try {
-          data = JSON.parse(data);
-        } catch {}
-      }
 
-      if (response.ok) {
-        setSubmitStatus('success');
-        setApiResponse(data);
-      } else {
-        setApiResponse(data);
-        console.error('API Response:', data);
-        throw new Error('Failed to get quote');
+      const result = await response.json();
+      setQuoteResult(result);
+      
+      // Show lead transfer option after successful quote
+      if (result.success) {
+        setShowLeadTransfer(true);
       }
     } catch (error) {
-      setSubmitStatus('error');
-      console.error('Error getting quote:', error);
+      console.error('Quote submission error:', error);
+      setQuoteResult({
+        success: false,
+        error: 'Failed to submit quote request'
+      });
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
 
-  const getUserFriendlyErrorMessage = (apiResponse: any): string => {
-    if (typeof apiResponse === 'object' && apiResponse.success === false && apiResponse.error) {
-      const errorMessage = apiResponse.error.message;
+  const handleLeadTransfer = async () => {
+    setIsTransferring(true);
+
+    try {
+      const leadPayload = {
+        source: leadTransferData.source,
+        first_name: leadTransferData.firstName,
+        last_name: leadTransferData.lastName,
+        email: leadTransferData.email,
+        contact_number: leadTransferData.contactNumber,
+        id_number: leadTransferData.idNumber,
+        agent_name: leadTransferData.agentName,
+        meta_data: {
+          ...leadTransferData.metaData,
+          quote_reference: quoteResult?.data?.quoteId,
+          vehicle_info: vehicleData,
+          coverage_info: coverageData
+        }
+      };
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/motor-lead`;
+      const headers = {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      };
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(leadPayload)
+      });
+
+      const result = await response.json();
       
-      if (errorMessage.includes('lead already exists') && errorMessage.includes('contact number') && errorMessage.includes('90 days')) {
-        return "We found an existing quote request with this phone number from the last 90 days. Please use a different phone number or contact our support team if you need assistance with your existing quote.";
+      if (result.success) {
+        alert('Lead transferred successfully!');
+        setShowLeadTransfer(false);
+      } else {
+        alert('Lead transfer failed. Please try again.');
       }
-      
-      if (errorMessage.includes('email') && errorMessage.includes('already exists')) {
-        return "This email address has already been used for a recent quote request. Please use a different email address or contact support.";
-      }
-      
-      if (errorMessage.includes('invalid') && errorMessage.includes('email')) {
-        return "Please enter a valid email address.";
-      }
-      
-      if (errorMessage.includes('invalid') && errorMessage.includes('phone') || errorMessage.includes('contact_number')) {
-        return "Please enter a valid phone number.";
-      }
-      
-      if (errorMessage.includes('required field')) {
-        return "Please fill in all required fields and try again.";
-      }
-      
-      return errorMessage;
+    } catch (error) {
+      console.error('Lead transfer error:', error);
+      alert('Lead transfer failed. Please try again.');
+    } finally {
+      setIsTransferring(false);
     }
-    
-    return "Something went wrong. Please try again or contact support.";
+  };
+
+  const tabs = [
+    { id: 'vehicle', label: 'Vehicle Info', icon: Car },
+    { id: 'driver', label: 'Driver Info', icon: User },
+    { id: 'contact', label: 'Contact Info', icon: Phone },
+    { id: 'coverage', label: 'Coverage', icon: CreditCard },
+    { id: 'lead-transfer', label: 'Lead Transfer', icon: UserCheck }
+  ];
+
+  const isFormValid = () => {
+    return vehicleData.make && vehicleData.model && vehicleData.year &&
+           driverData.firstName && driverData.lastName && driverData.age &&
+           contactData.email && contactData.phone &&
+           coverageData.coverType;
   };
 
   return (
-    <div className="min-h-screen bg-gray-900">
-      {/* Header */}
-      <div className="bg-gray-800 shadow-lg border-b-4 border-orange-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20">
-            <div className="flex items-center space-x-4">
-              <img 
-                src="https://kodomconnect.co.za/kodomconnectlogo.png" 
-                alt="Kodom Connect Logo" 
-                className="h-12 w-auto"
-              />
-              <h1 className="text-2xl font-bold text-orange-400">
-                Kodom Connect
-              </h1>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
+              <Car className="w-8 h-8 text-white" />
             </div>
-            <div className="flex items-center space-x-3 text-sm text-gray-300">
-              <Shield className="h-5 w-5 text-green-400" />
-              <span className="font-medium">Trusted & Secure</span>
-            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Quick Quotation</h1>
+            <p className="text-gray-600">Get your motor insurance quote in minutes</p>
           </div>
-        </div>
-      </div>
 
-      {/* Tab Navigation */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-        <div className="bg-gray-800 rounded-t-2xl shadow-lg border-b-0">
-          <div className="flex">
-            <button
-              onClick={() => setActiveTab('transfer')}
-              className={`flex-1 px-6 py-4 text-lg font-semibold rounded-tl-2xl transition-all duration-300 ${
-                activeTab === 'transfer'
-                  ? 'bg-orange-600 text-white shadow-lg'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              <div className="flex items-center justify-center space-x-2">
-                <Send className="h-5 w-5" />
-                <span>Transfer Lead</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('quote')}
-              className={`flex-1 px-6 py-4 text-lg font-semibold rounded-tr-2xl transition-all duration-300 ${
-                activeTab === 'quote'
-                  ? 'bg-green-600 text-white shadow-lg'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              <div className="flex items-center justify-center space-x-2">
-                <Calculator className="h-5 w-5" />
-                <span>Quick Quote</span>
-              </div>
-            </button>
+          {/* Navigation Tabs */}
+          <div className="flex flex-wrap justify-center mb-8 bg-white rounded-lg shadow-sm p-2">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center px-4 py-2 rounded-md transition-all duration-200 mx-1 mb-2 ${
+                    activeTab === tab.id
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 mr-2" />
+                  <span className="text-sm font-medium">{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
-        </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-        <div className="bg-gray-800 rounded-b-2xl shadow-xl border-t-0">
-          {activeTab === 'transfer' ? (
-            <div className="p-8">
-              <div className="text-center mb-8">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-600 rounded-full mb-4">
-                  <Send className="h-8 w-8 text-white" />
-                </div>
-                <h2 className="text-3xl font-bold text-orange-400 mb-2">
-                  Transfer Lead
-                </h2>
-                <p className="text-gray-400">Submit lead information for processing</p>
-              </div>
-
-              <form onSubmit={handleTransferSubmit} className="space-y-6">
+          {/* Form Content */}
+          <div className="bg-white rounded-xl shadow-lg p-8">
+            {/* Vehicle Information Tab */}
+            {activeTab === 'vehicle' && (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-semibold text-gray-900 mb-6">Vehicle Information</h2>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label htmlFor="first_name" className="block text-sm font-medium text-gray-300 mb-2">
-                      First Name *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Make *</label>
                     <input
                       type="text"
-                      id="first_name"
-                      name="first_name"
-                      value={formData.first_name}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
-                        errors.first_name
-                          ? 'border-red-500 focus:border-red-400'
-                          : 'border-gray-600 focus:border-orange-400'
-                      } focus:outline-none focus:ring-2 focus:ring-orange-500/20`}
-                      placeholder="Enter first name"
+                      value={vehicleData.make}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, make: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="e.g., Toyota"
                     />
-                    {errors.first_name && (
-                      <p className="mt-1 text-sm text-red-400">{errors.first_name}</p>
-                    )}
                   </div>
 
                   <div>
-                    <label htmlFor="last_name" className="block text-sm font-medium text-gray-300 mb-2">
-                      Last Name *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Model *</label>
                     <input
                       type="text"
-                      id="last_name"
-                      name="last_name"
-                      value={formData.last_name}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
-                        errors.last_name
-                          ? 'border-red-500 focus:border-red-400'
-                          : 'border-gray-600 focus:border-orange-400'
-                      } focus:outline-none focus:ring-2 focus:ring-orange-500/20`}
-                      placeholder="Enter last name"
+                      value={vehicleData.model}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, model: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="e.g., Corolla"
                     />
-                    {errors.last_name && (
-                      <p className="mt-1 text-sm text-red-400">{errors.last_name}</p>
-                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Year *</label>
+                    <input
+                      type="number"
+                      value={vehicleData.year}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, year: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="2020"
+                      min="1990"
+                      max="2025"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Engine Size</label>
+                    <input
+                      type="text"
+                      value={vehicleData.engineSize}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, engineSize: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="e.g., 1.6L"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Fuel Type</label>
+                    <select
+                      value={vehicleData.fuelType}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, fuelType: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    >
+                      <option value="">Select fuel type</option>
+                      <option value="petrol">Petrol</option>
+                      <option value="diesel">Diesel</option>
+                      <option value="hybrid">Hybrid</option>
+                      <option value="electric">Electric</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Transmission</label>
+                    <select
+                      value={vehicleData.transmission}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, transmission: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    >
+                      <option value="">Select transmission</option>
+                      <option value="manual">Manual</option>
+                      <option value="automatic">Automatic</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle Type</label>
+                    <select
+                      value={vehicleData.vehicleType}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, vehicleType: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    >
+                      <option value="">Select vehicle type</option>
+                      <option value="sedan">Sedan</option>
+                      <option value="hatchback">Hatchback</option>
+                      <option value="suv">SUV</option>
+                      <option value="bakkie">Bakkie</option>
+                      <option value="coupe">Coupe</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle Use</label>
+                    <select
+                      value={vehicleData.vehicleUse}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, vehicleUse: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    >
+                      <option value="">Select vehicle use</option>
+                      <option value="private">Private</option>
+                      <option value="business">Business</option>
+                      <option value="commercial">Commercial</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Parking Location</label>
+                    <select
+                      value={vehicleData.parkingLocation}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, parkingLocation: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    >
+                      <option value="">Select parking location</option>
+                      <option value="garage">Garage</option>
+                      <option value="driveway">Driveway</option>
+                      <option value="street">Street</option>
+                      <option value="secure_parking">Secure Parking</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Value (R)</label>
+                    <input
+                      type="number"
+                      value={vehicleData.estimatedValue}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, estimatedValue: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="250000"
+                    />
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
-                    Email Address *
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
-                      errors.email
-                        ? 'border-red-500 focus:border-red-400'
-                        : 'border-gray-600 focus:border-orange-400'
-                    } focus:outline-none focus:ring-2 focus:ring-orange-500/20`}
-                    placeholder="Enter email address"
-                  />
-                  {errors.email && (
-                    <p className="mt-1 text-sm text-red-400">{errors.email}</p>
-                  )}
+                  <label className="block text-sm font-medium text-gray-700 mb-3">Security Features</label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {['Alarm', 'Immobilizer', 'Tracking Device', 'Central Locking', 'Security Gates', 'Armed Response'].map((feature) => (
+                      <label key={feature} className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={vehicleData.securityFeatures.includes(feature)}
+                          onChange={(e) => handleSecurityFeatureChange(feature, e.target.checked)}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">{feature}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Modifications</label>
+                  <textarea
+                    value={vehicleData.modifications}
+                    onChange={(e) => setVehicleData(prev => ({ ...prev, modifications: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    rows={3}
+                    placeholder="Describe any modifications to the vehicle..."
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Driver Information Tab */}
+            {activeTab === 'driver' && (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-semibold text-gray-900 mb-6">Driver Information</h2>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label htmlFor="contact_number" className="block text-sm font-medium text-gray-300 mb-2">
-                      Contact Number *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
+                    <input
+                      type="text"
+                      value={driverData.firstName}
+                      onChange={(e) => setDriverData(prev => ({ ...prev, firstName: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="John"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Last Name *</label>
+                    <input
+                      type="text"
+                      value={driverData.lastName}
+                      onChange={(e) => setDriverData(prev => ({ ...prev, lastName: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="Smith"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Age *</label>
+                    <input
+                      type="number"
+                      value={driverData.age}
+                      onChange={(e) => setDriverData(prev => ({ ...prev, age: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="30"
+                      min="18"
+                      max="100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">License Type</label>
+                    <select
+                      value={driverData.licenseType}
+                      onChange={(e) => setDriverData(prev => ({ ...prev, licenseType: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    >
+                      <option value="">Select license type</option>
+                      <option value="code_b">Code B (Light Motor Vehicle)</option>
+                      <option value="code_c">Code C (Heavy Motor Vehicle)</option>
+                      <option value="code_eb">Code EB (Light Motor Vehicle with Trailer)</option>
+                      <option value="code_ec">Code EC (Heavy Motor Vehicle with Trailer)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Years Licensed</label>
+                    <input
+                      type="number"
+                      value={driverData.yearsLicensed}
+                      onChange={(e) => setDriverData(prev => ({ ...prev, yearsLicensed: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="10"
+                      min="0"
+                      max="50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Previous Claims</label>
+                    <select
+                      value={driverData.previousClaims}
+                      onChange={(e) => setDriverData(prev => ({ ...prev, previousClaims: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    >
+                      <option value="">Select claims history</option>
+                      <option value="none">No previous claims</option>
+                      <option value="1">1 claim</option>
+                      <option value="2">2 claims</option>
+                      <option value="3+">3 or more claims</option>
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Criminal Record</label>
+                    <div className="flex space-x-4">
+                      <label className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="criminalRecord"
+                          value="no"
+                          checked={driverData.criminalRecord === 'no'}
+                          onChange={(e) => setDriverData(prev => ({ ...prev, criminalRecord: e.target.value }))}
+                          className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">No</span>
+                      </label>
+                      <label className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="criminalRecord"
+                          value="yes"
+                          checked={driverData.criminalRecord === 'yes'}
+                          onChange={(e) => setDriverData(prev => ({ ...prev, criminalRecord: e.target.value }))}
+                          className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">Yes</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t pt-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Agent Name</label>
+                    <input
+                      type="text"
+                      value={driverData.agentName}
+                      onChange={(e) => setDriverData(prev => ({ ...prev, agentName: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="Agent handling this quote"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Contact Information Tab */}
+            {activeTab === 'contact' && (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-semibold text-gray-900 mb-6">Contact Information</h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email Address *</label>
+                    <input
+                      type="email"
+                      value={contactData.email}
+                      onChange={(e) => setContactData(prev => ({ ...prev, email: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="john@example.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number *</label>
                     <input
                       type="tel"
-                      id="contact_number"
-                      name="contact_number"
-                      value={formData.contact_number}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
-                        errors.contact_number
-                          ? 'border-red-500 focus:border-red-400'
-                          : 'border-gray-600 focus:border-orange-400'
-                      } focus:outline-none focus:ring-2 focus:ring-orange-500/20`}
-                      placeholder="Enter phone number"
+                      value={contactData.phone}
+                      onChange={(e) => setContactData(prev => ({ ...prev, phone: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="0123456789"
                     />
-                    {errors.contact_number && (
-                      <p className="mt-1 text-sm text-red-400">{errors.contact_number}</p>
-                    )}
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">ID Number</label>
+                    <input
+                      type="text"
+                      value={contactData.idNumber}
+                      onChange={(e) => setContactData(prev => ({ ...prev, idNumber: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="9001010000000"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Coverage Information Tab */}
+            {activeTab === 'coverage' && (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-semibold text-gray-900 mb-6">Coverage Options</h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Cover Type *</label>
+                    <select
+                      value={coverageData.coverType}
+                      onChange={(e) => setCoverageData(prev => ({ ...prev, coverType: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    >
+                      <option value="">Select cover type</option>
+                      <option value="comprehensive">Comprehensive</option>
+                      <option value="third_party">Third Party</option>
+                      <option value="third_party_fire_theft">Third Party, Fire & Theft</option>
+                    </select>
                   </div>
 
                   <div>
-                    <label htmlFor="id_number" className="block text-sm font-medium text-gray-300 mb-2">
-                      ID Number (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      id="id_number"
-                      name="id_number"
-                      value={formData.id_number}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
-                        errors.id_number
-                          ? 'border-red-500 focus:border-red-400'
-                          : 'border-gray-600 focus:border-orange-400'
-                      } focus:outline-none focus:ring-2 focus:ring-orange-500/20`}
-                      placeholder="Enter ID number"
-                    />
-                    {errors.id_number && (
-                      <p className="mt-1 text-sm text-red-400">{errors.id_number}</p>
-                    )}
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Excess Amount (R)</label>
+                    <select
+                      value={coverageData.excess}
+                      onChange={(e) => setCoverageData(prev => ({ ...prev, excess: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    >
+                      <option value="">Select excess</option>
+                      <option value="0">R0</option>
+                      <option value="2500">R2,500</option>
+                      <option value="5000">R5,000</option>
+                      <option value="7500">R7,500</option>
+                      <option value="10000">R10,000</option>
+                    </select>
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="agent_name" className="block text-sm font-medium text-gray-300 mb-2">
-                    Agent Name *
-                  </label>
-                  <input
-                    type="text"
-                    id="agent_name"
-                    name="agent_name"
-                    value={formData.agent_name}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
-                      errors.agent_name
-                        ? 'border-red-500 focus:border-red-400'
-                        : 'border-gray-600 focus:border-orange-400'
-                    } focus:outline-none focus:ring-2 focus:ring-orange-500/20`}
-                    placeholder="Enter agent name"
-                  />
-                  {errors.agent_name && (
-                    <p className="mt-1 text-sm text-red-400">{errors.agent_name}</p>
-                  )}
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      <span>Transferring Lead...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-5 w-5" />
-                      <span>Transfer Lead</span>
-                    </>
-                  )}
-                </button>
-              </form>
-            </div>
-          ) : (
-            <div className="p-8">
-              <div className="text-center mb-8">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-green-600 rounded-full mb-4">
-                  <Calculator className="h-8 w-8 text-white" />
-                </div>
-                <h2 className="text-3xl font-bold text-green-400 mb-2">
-                  Quick Quote
-                </h2>
-                <p className="text-gray-400">Get a comprehensive vehicle insurance quote</p>
-              </div>
-
-              <form onSubmit={handleQuickQuoteSubmit} className="space-y-8">
-                {/* Vehicle Information */}
-                <div className="bg-green-900/30 p-6 rounded-xl border border-green-700">
-                  <h3 className="text-xl font-semibold text-green-400 mb-4 flex items-center">
-                    <Car className="h-5 w-5 mr-2" />
-                    Vehicle Information
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Year *</label>
-                      <input
-                        type="number"
-                        name="year"
-                        value={quickQuoteData.year}
-                        onChange={handleInputChange}
-                        min="1990"
-                        max={new Date().getFullYear() + 1}
-                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-600 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 bg-gray-700 text-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Make *</label>
-                      <input
-                        type="text"
-                        name="make"
-                        value={quickQuoteData.make}
-                        onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
-                          errors.make ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-green-400'
-                        } focus:outline-none focus:ring-2 focus:ring-green-500/20`}
-                        placeholder="e.g., Volkswagen"
-                      />
-                      {errors.make && <p className="mt-1 text-sm text-red-400">{errors.make}</p>}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Model *</label>
-                      <input
-                        type="text"
-                        name="model"
-                        value={quickQuoteData.model}
-                        onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
-                          errors.model ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-green-400'
-                        } focus:outline-none focus:ring-2 focus:ring-green-500/20`}
-                        placeholder="e.g., Polo TSI 1.2 Comfortline"
-                      />
-                      {errors.model && <p className="mt-1 text-sm text-red-400">{errors.model}</p>}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Colour *</label>
-                      <input
-                        type="text"
-                        name="colour"
-                        value={quickQuoteData.colour}
-                        onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
-                          errors.colour ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-green-400'
-                        } focus:outline-none focus:ring-2 focus:ring-green-500/20`}
-                        placeholder="e.g., White"
-                      />
-                      {errors.colour && <p className="mt-1 text-sm text-red-400">{errors.colour}</p>}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Engine Size (L)</label>
-                      <input
-                        type="number"
-                        name="engineSize"
-                        value={quickQuoteData.engineSize}
-                        onChange={handleInputChange}
-                        step="0.1"
-                        min="0.1"
-                        max="10"
-                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-600 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 bg-gray-700 text-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">MM Code</label>
-                      <input
-                        type="text"
-                        name="mmCode"
-                        value={quickQuoteData.mmCode}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-600 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 bg-gray-700 text-white"
-                        placeholder="Optional"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Retail Value (R) *</label>
-                      <input
-                        type="number"
-                        name="retailValue"
-                        value={quickQuoteData.retailValue}
-                        onChange={handleInputChange}
-                        min="0"
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
-                          errors.retailValue ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-green-400'
-                        } focus:outline-none focus:ring-2 focus:ring-green-500/20`}
-                      />
-                      {errors.retailValue && <p className="mt-1 text-sm text-red-400">{errors.retailValue}</p>}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Market Value (R) *</label>
-                      <input
-                        type="number"
-                        name="marketValue"
-                        value={quickQuoteData.marketValue}
-                        onChange={handleInputChange}
-                        min="0"
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
-                          errors.marketValue ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-green-400'
-                        } focus:outline-none focus:ring-2 focus:ring-green-500/20`}
-                      />
-                      {errors.marketValue && <p className="mt-1 text-sm text-red-400">{errors.marketValue}</p>}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Cover Type</label>
-                      <select
-                        name="coverCode"
-                        value={quickQuoteData.coverCode}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-600 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 bg-gray-700 text-white"
-                      >
-                        <option value="Comprehensive">Comprehensive</option>
-                        <option value="Third Party">Third Party</option>
-                        <option value="Third Party Fire & Theft">Third Party Fire & Theft</option>
-                      </select>
-                    </div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">Additional Cover Options</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {['Roadside Assistance', 'Rental Car', 'Personal Accident', 'Windscreen Cover', 'Hail Damage', 'Tyre & Rim'].map((cover) => (
+                      <label key={cover} className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={coverageData.additionalCover.includes(cover)}
+                          onChange={(e) => handleAdditionalCoverChange(cover, e.target.checked)}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">{cover}</span>
+                      </label>
+                    ))}
                   </div>
                 </div>
 
-                {/* Address Information */}
-                <div className="bg-blue-900/30 p-6 rounded-xl border border-blue-700">
-                  <h3 className="text-xl font-semibold text-blue-400 mb-4">Address Information</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Address Line *</label>
-                      <input
-                        type="text"
-                        name="addressLine"
-                        value={quickQuoteData.addressLine}
-                        onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
-                          errors.addressLine ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-blue-400'
-                        } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
-                        placeholder="123 Main Street"
-                      />
-                      {errors.addressLine && <p className="mt-1 text-sm text-red-400">{errors.addressLine}</p>}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Suburb *</label>
-                      <input
-                        type="text"
-                        name="suburb"
-                        value={quickQuoteData.suburb}
-                        onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
-                          errors.suburb ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-blue-400'
-                        } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
-                        placeholder="Sandton"
-                      />
-                      {errors.suburb && <p className="mt-1 text-sm text-red-400">{errors.suburb}</p>}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Postal Code *</label>
-                      <input
-                        type="text"
-                        name="postalCode"
-                        value={quickQuoteData.postalCode}
-                        onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
-                          errors.postalCode ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-blue-400'
-                        } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
-                        placeholder="2196"
-                      />
-                      {errors.postalCode && <p className="mt-1 text-sm text-red-400">{errors.postalCode}</p>}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Driver Information */}
-                <div className="bg-purple-900/30 p-6 rounded-xl border border-purple-700">
-                  <h3 className="text-xl font-semibold text-purple-400 mb-4">Driver Information</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Email Address *</label>
-                      <input
-                        type="email"
-                        name="emailAddress"
-                        value={quickQuoteData.emailAddress}
-                        onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
-                          errors.emailAddress ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-purple-400'
-                        } focus:outline-none focus:ring-2 focus:ring-purple-500/20`}
-                        placeholder="example@gmail.com"
-                      />
-                      {errors.emailAddress && <p className="mt-1 text-sm text-red-400">{errors.emailAddress}</p>}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Mobile Number *</label>
-                      <input
-                        type="tel"
-                        name="mobileNumber"
-                        value={quickQuoteData.mobileNumber}
-                        onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
-                          errors.mobileNumber ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-purple-400'
-                        } focus:outline-none focus:ring-2 focus:ring-purple-500/20`}
-                        placeholder="0821234567"
-                      />
-                      {errors.mobileNumber && <p className="mt-1 text-sm text-red-400">{errors.mobileNumber}</p>}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">ID Number *</label>
-                      <input
-                        type="text"
-                        name="idNumber"
-                        value={quickQuoteData.idNumber}
-                        onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
-                          errors.idNumber ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-purple-400'
-                        } focus:outline-none focus:ring-2 focus:ring-purple-500/20`}
-                        placeholder="9404054800086"
-                      />
-                      {errors.idNumber && <p className="mt-1 text-sm text-red-400">{errors.idNumber}</p>}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Date of Birth (Auto-filled from ID)</label>
-                      <input
-                        type="date"
-                        name="dateOfBirth"
-                        value={quickQuoteData.dateOfBirth}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-600 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 bg-gray-700 text-white"
-                        readOnly
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">License Issue Date *</label>
-                      <input
-                        type="date"
-                        name="licenseIssueDate"
-                        value={quickQuoteData.licenseIssueDate}
-                        onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border-2 transition-all duration-200 bg-gray-700 text-white ${
-                          errors.licenseIssueDate ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-purple-400'
-                        } focus:outline-none focus:ring-2 focus:ring-purple-500/20`}
-                      />
-                      {errors.licenseIssueDate && <p className="mt-1 text-sm text-red-400">{errors.licenseIssueDate}</p>}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Marital Status</label>
-                      <select
-                        name="maritalStatus"
-                        value={quickQuoteData.maritalStatus}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-600 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 bg-gray-700 text-white"
-                      >
-                        <option value="Single">Single</option>
-                        <option value="Married">Married</option>
-                        <option value="Divorced">Divorced</option>
-                        <option value="Widowed">Widowed</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Years Without Claims</label>
-                      <input
-                        type="number"
-                        name="yearsWithoutClaims"
-                        value={quickQuoteData.yearsWithoutClaims}
-                        onChange={handleInputChange}
-                        min="0"
-                        max="50"
-                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-600 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 bg-gray-700 text-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">External Reference ID (Auto-generated)</label>
-                      <input
-                        type="text"
-                        name="externalReferenceId"
-                        value={quickQuoteData.externalReferenceId}
-                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-600 bg-gray-700 text-gray-400"
-                        readOnly
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      <span>Getting Quote...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Calculator className="h-5 w-5" />
-                      <span>Get Quick Quote</span>
-                    </>
-                  )}
-                </button>
-              </form>
-            </div>
-          )}
-
-          {/* Status Messages */}
-          {submitStatus === 'success' && (
-            <div className="mx-8 mb-8">
-              <div className="bg-green-900/50 p-6 rounded-lg border-2 border-green-600">
-                <div className="flex items-center space-x-2 text-green-400 mb-4">
-                  <CheckCircle className="h-6 w-6" />
-                  <span className="text-lg font-semibold">Success!</span>
-                </div>
-                {apiResponse && (
-                  <div className="text-gray-300">
-                    {activeTab === 'transfer' && apiResponse.data && (
+                <div className="bg-blue-50 p-6 rounded-lg">
+                  <h3 className="text-lg font-semibold text-blue-900 mb-4">Ready to Get Your Quote?</h3>
+                  <p className="text-blue-700 mb-4">
+                    Review your information and click the button below to get your personalized motor insurance quote.
+                  </p>
+                  <button
+                    onClick={handleQuoteSubmit}
+                    disabled={!isFormValid() || isLoading}
+                    className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center"
+                  >
+                    {isLoading ? (
                       <>
-                        <div className="mb-4">
-                          <strong>Lead Reference:</strong> {apiResponse.data.uuid}
-                        </div>
-                        {apiResponse.data.redirect_url && (
-                          <a
-                            href={apiResponse.data.redirect_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-block bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
-                          >
-                            Continue to Your Lead
-                          </a>
-                        )}
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-5 h-5 mr-2" />
+                        Get Quote
                       </>
                     )}
-                    {activeTab === 'quote' && (
-                      <div>
-                        {apiResponse.success && apiResponse.data && Array.isArray(apiResponse.data) && apiResponse.data.length > 0 ? (
-                          <div className="space-y-4">
-                            <p className="mb-4 text-green-400 font-semibold">Your quote has been generated successfully!</p>
-                            {apiResponse.data.map((quote: QuoteResult, index: number) => (
-                              <div key={index} className="bg-gray-800 p-6 rounded-lg border border-green-600">
-                                <h4 className="text-xl font-bold text-green-400 mb-4">Quote Details</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  <div className="bg-green-900/30 p-4 rounded-lg border border-green-700">
-                                    <div className="flex items-center space-x-2 mb-2">
-                                      <DollarSign className="h-5 w-5 text-green-400" />
-                                      <span className="text-sm font-medium text-gray-300">Monthly Premium</span>
-                                    </div>
-                                    <div className="text-2xl font-bold text-green-400">
-                                      {formatCurrency(quote.premium)}
-                                    </div>
-                                  </div>
-                                  <div className="bg-orange-900/30 p-4 rounded-lg border border-orange-700">
-                                    <div className="flex items-center space-x-2 mb-2">
-                                      <Shield className="h-5 w-5 text-orange-400" />
-                                      <span className="text-sm font-medium text-gray-300">Excess Amount</span>
-                                    </div>
-                                    <div className="text-2xl font-bold text-orange-400">
-                                      {formatCurrency(quote.excess)}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div>
-                            <p className="mb-4">Your quote request has been processed successfully!</p>
-                            <details className="mt-4">
-                              <summary className="cursor-pointer text-green-400 font-medium">View Quote Details</summary>
-                              <pre className="mt-2 text-xs bg-gray-900 p-4 rounded overflow-auto border border-green-700">
-                                {JSON.stringify(apiResponse, null, 2)}
-                              </pre>
-                            </details>
-                          </div>
+                  </button>
+                </div>
+
+                {/* Quote Result */}
+                {quoteResult && (
+                  <div className={`p-6 rounded-lg ${quoteResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                    <h3 className={`text-lg font-semibold mb-2 ${quoteResult.success ? 'text-green-900' : 'text-red-900'}`}>
+                      {quoteResult.success ? 'Quote Generated Successfully!' : 'Quote Generation Failed'}
+                    </h3>
+                    {quoteResult.success ? (
+                      <div className="space-y-2">
+                        {quoteResult.data?.quoteId && (
+                          <p className="text-green-700">Quote ID: {quoteResult.data.quoteId}</p>
                         )}
+                        {quoteResult.data?.premium && (
+                          <p className="text-green-700">Premium: R{quoteResult.data.premium}</p>
+                        )}
+                        <p className="text-green-700">Your quote has been saved and you can proceed with the lead transfer if needed.</p>
                       </div>
+                    ) : (
+                      <p className="text-red-700">{quoteResult.error || 'An error occurred while generating your quote.'}</p>
                     )}
                   </div>
                 )}
-              </div>
-            </div>
-          )}
-          
-          {submitStatus === 'error' && (
-            <div className="mx-8 mb-8">
-              <div className="bg-red-900/50 p-6 rounded-lg border-2 border-red-600">
-                <div className="flex items-center space-x-2 text-red-400 mb-2">
-                  <AlertCircle className="h-5 w-5" />
-                  <span className="font-semibold">Error occurred</span>
-                </div>
-                <p className="text-red-300 mb-4">{getUserFriendlyErrorMessage(apiResponse)}</p>
-                
-                {apiResponse && 
-                 typeof apiResponse === 'object' && 
-                 apiResponse.error && 
-                 apiResponse.error.message && 
-                 apiResponse.error.message.includes('lead already exists') && (
-                  <div className="mb-4">
-                    <button
-                      onClick={() => window.open('mailto:support@quicksave.co.za?subject=Existing Quote Request&body=I need help with my existing quote request for phone number: ' + (activeTab === 'transfer' ? formData.contact_number : quickQuoteData.mobileNumber), '_blank')}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
-                    >
-                      Contact Support
-                    </button>
+
+                {/* Lead Transfer Prompt */}
+                {showLeadTransfer && quoteResult?.success && (
+                  <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-lg">
+                    <h3 className="text-lg font-semibold text-yellow-900 mb-2">Transfer Lead?</h3>
+                    <p className="text-yellow-700 mb-4">
+                      Would you like to transfer this lead for further processing and follow-up?
+                    </p>
+                    <div className="flex space-x-4">
+                      <button
+                        onClick={handleLeadTransfer}
+                        disabled={isTransferring}
+                        className="bg-yellow-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-yellow-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200 flex items-center"
+                      >
+                        {isTransferring ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Transferring...
+                          </>
+                        ) : (
+                          <>
+                            <UserCheck className="w-4 h-4 mr-2" />
+                            Yes, Transfer Lead
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => setShowLeadTransfer(false)}
+                        className="bg-gray-300 text-gray-700 py-2 px-4 rounded-lg font-medium hover:bg-gray-400 transition-all duration-200"
+                      >
+                        No, Skip
+                      </button>
+                    </div>
                   </div>
                 )}
-                
-                {apiResponse && (
-                  <details className="mt-4">
-                    <summary className="cursor-pointer text-red-400 font-medium">View Technical Details</summary>
-                    <pre className="mt-2 text-xs bg-gray-900 p-2 rounded overflow-auto border border-red-700">
-                      {typeof apiResponse === "string" ? apiResponse : JSON.stringify(apiResponse, null, 2)}
-                    </pre>
-                  </details>
-                )}
               </div>
-            </div>
-          )}
-        </div>
+            )}
 
-        {/* Benefits Section */}
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="text-center p-6 bg-gray-800 rounded-xl shadow-lg border-2 border-orange-600 hover:shadow-xl transition-all duration-300">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-orange-600 rounded-lg mb-4">
-              <Shield className="h-6 w-6 text-white" />
-            </div>
-            <h3 className="text-lg font-semibold text-orange-400 mb-2">Comprehensive Coverage</h3>
-            <p className="text-gray-400">Protection for your vehicle and peace of mind</p>
+            {/* Lead Transfer Tab */}
+            {activeTab === 'lead-transfer' && (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-semibold text-gray-900 mb-6">Lead Transfer</h2>
+                
+                <div className="bg-blue-50 p-4 rounded-lg mb-6">
+                  <p className="text-blue-700 text-sm">
+                    This information is automatically populated from the driver and contact details you provided earlier.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+                    <input
+                      type="text"
+                      value={leadTransferData.firstName}
+                      onChange={(e) => setLeadTransferData(prev => ({ ...prev, firstName: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                    <input
+                      type="text"
+                      value={leadTransferData.lastName}
+                      onChange={(e) => setLeadTransferData(prev => ({ ...prev, lastName: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                    <input
+                      type="email"
+                      value={leadTransferData.email}
+                      onChange={(e) => setLeadTransferData(prev => ({ ...prev, email: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Contact Number</label>
+                    <input
+                      type="tel"
+                      value={leadTransferData.contactNumber}
+                      onChange={(e) => setLeadTransferData(prev => ({ ...prev, contactNumber: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">ID Number</label>
+                    <input
+                      type="text"
+                      value={leadTransferData.idNumber}
+                      onChange={(e) => setLeadTransferData(prev => ({ ...prev, idNumber: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Agent Name</label>
+                    <input
+                      type="text"
+                      value={leadTransferData.agentName}
+                      onChange={(e) => setLeadTransferData(prev => ({ ...prev, agentName: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Source</label>
+                    <input
+                      type="text"
+                      value={leadTransferData.source}
+                      onChange={(e) => setLeadTransferData(prev => ({ ...prev, source: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-green-50 p-6 rounded-lg">
+                  <h3 className="text-lg font-semibold text-green-900 mb-4">Transfer Lead</h3>
+                  <p className="text-green-700 mb-4">
+                    Click the button below to transfer this lead for further processing.
+                  </p>
+                  <button
+                    onClick={handleLeadTransfer}
+                    disabled={isTransferring || !leadTransferData.firstName || !leadTransferData.lastName || !leadTransferData.email}
+                    className="w-full bg-green-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center"
+                  >
+                    {isTransferring ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                        Transferring Lead...
+                      </>
+                    ) : (
+                      <>
+                        <UserCheck className="w-5 h-5 mr-2" />
+                        Transfer Lead
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-          
-          <div className="text-center p-6 bg-gray-800 rounded-xl shadow-lg border-2 border-green-600 hover:shadow-xl transition-all duration-300">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-green-600 rounded-lg mb-4">
-              <DollarSign className="h-6 w-6 text-white" />
-            </div>
-            <h3 className="text-lg font-semibold text-green-400 mb-2">Best Prices</h3>
-            <p className="text-gray-400">Compare quotes from top insurers instantly</p>
-          </div>
-          
-          <div className="text-center p-6 bg-gray-800 rounded-xl shadow-lg border-2 border-blue-600 hover:shadow-xl transition-all duration-300">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-600 rounded-lg mb-4">
-              <CheckCircle className="h-6 w-6 text-white" />
-            </div>
-            <h3 className="text-lg font-semibold text-blue-400 mb-2">Quick Process</h3>
-            <p className="text-gray-400">Get your quote in under 5 minutes</p>
+
+          {/* Navigation Buttons */}
+          <div className="flex justify-between mt-8">
+            <button
+              onClick={() => {
+                const currentIndex = tabs.findIndex(tab => tab.id === activeTab);
+                if (currentIndex > 0) {
+                  setActiveTab(tabs[currentIndex - 1].id);
+                }
+              }}
+              disabled={activeTab === 'vehicle'}
+              className="px-6 py-3 bg-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed transition-all duration-200"
+            >
+              Previous
+            </button>
+
+            <button
+              onClick={() => {
+                const currentIndex = tabs.findIndex(tab => tab.id === activeTab);
+                if (currentIndex < tabs.length - 1) {
+                  setActiveTab(tabs[currentIndex + 1].id);
+                }
+              }}
+              disabled={activeTab === 'lead-transfer'}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200"
+            >
+              Next
+            </button>
           </div>
         </div>
       </div>

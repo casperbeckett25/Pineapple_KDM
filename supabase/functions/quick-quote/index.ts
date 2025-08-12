@@ -37,7 +37,8 @@ Deno.serve(async (req: Request) => {
     );
 
     const api_url = "http://gw.pineapple.co.za/api/v1/quote/quick-quote";
-    const token = "KEY=Qr6Ty8Pw3Nv1Az5Gh7Lc9BmK SECRET=S1dF2gH3jK4lM5nP6qR7tV8wX9yZ0aB1cD2eF3gH4iJ5kL6mN7oP8qR9sT0uV1wX2";
+    const apiKey = "Qr6Ty8Pw3Nv1Az5Gh7Lc9BmK";
+    const apiSecret = "S1dF2gH3jK4lM5nP6qR7tV8wX9yZ0aB1cD2eF3gH4iJ5kL6mN7oP8qR9sT0uV1wX2";
 
     // Get the request body
     const requestData = await req.json();
@@ -74,7 +75,8 @@ Deno.serve(async (req: Request) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
+        "X-API-Key": apiKey,
+        "X-API-Secret": apiSecret,
       },
       body: JSON.stringify(requestData),
     });

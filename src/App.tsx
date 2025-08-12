@@ -741,7 +741,11 @@ function App() {
                         <p className="text-green-700">Your quote has been saved and you can proceed with the lead transfer if needed.</p>
                       </div>
                     ) : (
-                      <p className="text-red-700">{quoteResult.error || 'An error occurred while generating your quote.'}</p>
+                      <p className="text-red-700">{
+                        typeof quoteResult.error === 'object' 
+                          ? quoteResult.error?.message || 'An error occurred while generating your quote.'
+                          : quoteResult.error || 'An error occurred while generating your quote.'
+                      }</p>
                     )}
                   </div>
                 )}

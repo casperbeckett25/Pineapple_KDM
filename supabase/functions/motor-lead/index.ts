@@ -114,9 +114,18 @@ Deno.serve(async (req: Request) => {
       .update(updateData)
       .eq('id', leadData.id);
 
-    // Return the response with the same status code
-    return new Response(responseText, {
+    // Return structured JSON response
+    const structuredResponse = {
+      success: response.ok,
       status: response.status,
+      data: response.ok ? responseData : null,
+      error: response.ok ? null : (typeof responseData === 'string' ? responseData : responseData?.message || 'API request failed'),
+      quote_reference: updateData.quote_reference || null,
+      redirect_url: updateData.redirect_url || null
+    };
+
+    return new Response(JSON.stringify(structuredResponse), {
+      status: 200,
       headers: {
         "Content-Type": "application/json",
         ...corsHeaders,

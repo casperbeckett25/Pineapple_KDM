@@ -242,7 +242,19 @@ function App() {
         body: JSON.stringify(leadPayload)
       });
 
-      const result = await response.json();
+      const responseText = await response.text();
+      let result;
+      
+      if (responseText) {
+        try {
+          result = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('Failed to parse response as JSON:', parseError);
+          result = { success: false, error: 'Invalid response format' };
+        }
+      } else {
+        result = { success: false, error: 'Empty response from server' };
+      }
       
       if (result.success) {
         alert('Lead transferred successfully!');

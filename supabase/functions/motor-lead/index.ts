@@ -37,7 +37,7 @@ Deno.serve(async (req: Request) => {
     );
 
     const api_url = "http://gw.pineapple.co.za/users/motor_lead";
-    const token = "KEY=PIConeT2hy1xGyAxsxQXcYkn SECRET=U3vV5mDa5EHTLy8FIeq7EjH7FBEGGaPcoYVtObHpgvGpz7cK4Km3qrxZGEPPN5KF";
+    const token = "KEY=Qr6Ty8Pw3Nv1Az5Gh7Lc9BmK SECRET=S1dF2gH3jK4lM5nP6qR7tV8wX9yZ0aB1cD2eF3gH4iJ5kL6mN7oP8qR9sT0uV1wX2";
 
     // Get the request body
     const requestData = await req.json();
@@ -52,8 +52,7 @@ Deno.serve(async (req: Request) => {
         email: requestData.email,
         contact_number: requestData.contact_number,
         id_number: requestData.id_number || '',
-        agent_name: requestData.agent_name || '',
-        meta_data: requestData.meta_data || {},
+        quote_id: requestData.quote_id || '',
         status: 'pending'
       })
       .select()

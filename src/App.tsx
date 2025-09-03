@@ -7,25 +7,40 @@ interface VehicleData {
   model: string;
   year: string;
   engineSize: string;
-  fuelType: string;
-  transmission: string;
-  vehicleType: string;
-  vehicleUse: string;
-  parkingLocation: string;
-  securityFeatures: string[];
-  modifications: string;
-  estimatedValue: string;
+  mmCode: string;
+  modified: string;
+  category: string;
+  colour: string;
+  financed: string;
+  owner: string;
+  status: string;
+  partyIsRegularDriver: string;
+  accessories: string;
+  accessoriesAmount: string;
+  retailValue: string;
+  marketValue: string;
+  insuredValueType: string;
+  useType: string;
+  overnightParkingSituation: string;
+  coverCode: string;
+  addressLine: string;
+  postalCode: string;
+  suburb: string;
+  latitude: string;
+  longitude: string;
 }
 
 interface DriverData {
   firstName: string;
   lastName: string;
-  agentName: string;
   age: string;
-  licenseType: string;
-  yearsLicensed: string;
-  previousClaims: string;
-  criminalRecord: string;
+  maritalStatus: string;
+  currentlyInsured: string;
+  yearsWithoutClaims: string;
+  relationToPolicyHolder: string;
+  prvInsLosses: string;
+  licenseIssueDate: string;
+  dateOfBirth: string;
 }
 
 interface ContactData {
@@ -35,9 +50,9 @@ interface ContactData {
 }
 
 interface CoverageData {
-  coverType: string;
-  excess: string;
-  additionalCover: string[];
+  agentName: string;
+  applicationUser: string;
+  applicationUserEmail: string;
 }
 
 interface QuoteResponse {
@@ -56,31 +71,47 @@ function App() {
   const [quoteResult, setQuoteResult] = useState<QuoteResponse | null>(null);
   const [showLeadTransfer, setShowLeadTransfer] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   const [vehicleData, setVehicleData] = useState<VehicleData>({
     make: '',
     model: '',
     year: '',
     engineSize: '',
-    fuelType: '',
-    transmission: '',
-    vehicleType: '',
-    vehicleUse: '',
-    parkingLocation: '',
-    securityFeatures: [],
-    modifications: '',
-    estimatedValue: ''
+    mmCode: '',
+    modified: 'N',
+    category: '',
+    colour: '',
+    financed: 'N',
+    owner: 'Y',
+    status: 'New',
+    partyIsRegularDriver: 'Y',
+    accessories: 'N',
+    accessoriesAmount: '0',
+    retailValue: '',
+    marketValue: '',
+    insuredValueType: 'Retail',
+    useType: '',
+    overnightParkingSituation: '',
+    coverCode: '',
+    addressLine: '',
+    postalCode: '',
+    suburb: '',
+    latitude: '',
+    longitude: ''
   });
 
   const [driverData, setDriverData] = useState<DriverData>({
     firstName: '',
     lastName: '',
-    agentName: '',
     age: '',
-    licenseType: '',
-    yearsLicensed: '',
-    previousClaims: '',
-    criminalRecord: ''
+    maritalStatus: '',
+    currentlyInsured: 'true',
+    yearsWithoutClaims: '0',
+    relationToPolicyHolder: 'Self',
+    prvInsLosses: '0',
+    licenseIssueDate: '',
+    dateOfBirth: ''
   });
 
   const [contactData, setContactData] = useState<ContactData>({
@@ -90,9 +121,9 @@ function App() {
   });
 
   const [coverageData, setCoverageData] = useState<CoverageData>({
-    coverType: '',
-    excess: '',
-    additionalCover: []
+    agentName: '',
+    applicationUser: '',
+    applicationUserEmail: ''
   });
 
   const [leadTransferData, setLeadTransferData] = useState({
@@ -101,9 +132,8 @@ function App() {
     email: '',
     contactNumber: '',
     idNumber: '',
-    agentName: '',
-    source: 'Kodom_Connect',
-    metaData: {}
+    source: 'KodomBranchOne',
+    quoteId: ''
   });
 
   // Auto-populate lead transfer data when driver/contact data changes
@@ -112,32 +142,64 @@ function App() {
       ...prev,
       firstName: driverData.firstName,
       lastName: driverData.lastName,
-      agentName: driverData.agentName,
       email: contactData.email,
       contactNumber: contactData.phone,
-      idNumber: contactData.idNumber
+      idNumber: contactData.idNumber,
+      quoteId: quoteResult?.data?.quoteId || ''
     }));
-  }, [driverData.firstName, driverData.lastName, driverData.agentName, contactData.email, contactData.phone, contactData.idNumber]);
+  }, [driverData.firstName, driverData.lastName, contactData.email, contactData.phone, contactData.idNumber, quoteResult?.data?.quoteId]);
 
-  const handleSecurityFeatureChange = (feature: string, checked: boolean) => {
-    setVehicleData(prev => ({
-      ...prev,
-      securityFeatures: checked
-        ? [...prev.securityFeatures, feature]
-        : prev.securityFeatures.filter(f => f !== feature)
-    }));
+  // Validation functions
+  const validateIdNumber = (idNumber: string): boolean => {
+    // South African ID number validation (13 digits)
+    const idRegex = /^\d{13}$/;
+    return idRegex.test(idNumber);
   };
 
-  const handleAdditionalCoverChange = (cover: string, checked: boolean) => {
-    setCoverageData(prev => ({
-      ...prev,
-      additionalCover: checked
-        ? [...prev.additionalCover, cover]
-        : prev.additionalCover.filter(c => c !== cover)
-    }));
+  const validateAge = (age: string): boolean => {
+    const ageNum = parseInt(age);
+    return ageNum >= 18 && ageNum <= 100;
+  };
+
+  const calculateDateOfBirth = (age: string): string => {
+    if (!age) return '';
+    const currentYear = new Date().getFullYear();
+    const birthYear = currentYear - parseInt(age);
+    return `${birthYear}-01-01`; // Default to January 1st
+  };
+
+  // Update date of birth when age changes
+  React.useEffect(() => {
+    if (driverData.age) {
+      const dob = calculateDateOfBirth(driverData.age);
+      setDriverData(prev => ({ ...prev, dateOfBirth: dob }));
+    }
+  }, [driverData.age]);
+
+  const validateForm = (): string[] => {
+    const errors: string[] = [];
+
+    // ID Number validation
+    if (contactData.idNumber && !validateIdNumber(contactData.idNumber)) {
+      errors.push('ID Number must be exactly 13 digits');
+    }
+
+    // Age validation
+    if (driverData.age && !validateAge(driverData.age)) {
+      errors.push('Age must be between 18 and 100 years');
+    }
+
+    return errors;
   };
 
   const handleQuoteSubmit = async () => {
+    const errors = validateForm();
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+
+    setValidationErrors([]);
     setIsLoading(true);
     setQuoteResult(null);
 
@@ -145,39 +207,49 @@ function App() {
       const quotePayload = {
         source: "KodomBranchOne",
         externalReferenceId: `QUOTE_${Date.now()}`,
+        application_user: coverageData.applicationUser || undefined,
+        application_user_email: coverageData.applicationUserEmail || undefined,
         vehicles: [{
+          year: parseInt(vehicleData.year),
           make: vehicleData.make,
           model: vehicleData.model,
-          year: parseInt(vehicleData.year),
-          engineSize: vehicleData.engineSize,
-          fuelType: vehicleData.fuelType,
-          transmission: vehicleData.transmission,
-          vehicleType: vehicleData.vehicleType,
-          vehicleUse: vehicleData.vehicleUse,
-          parkingLocation: vehicleData.parkingLocation,
-          securityFeatures: vehicleData.securityFeatures,
-          modifications: vehicleData.modifications,
-          estimatedValue: parseFloat(vehicleData.estimatedValue) || 0
-        }],
-        driver: {
-          firstName: driverData.firstName,
-          lastName: driverData.lastName,
-          age: parseInt(driverData.age),
-          licenseType: driverData.licenseType,
-          yearsLicensed: parseInt(driverData.yearsLicensed),
-          previousClaims: driverData.previousClaims,
-          criminalRecord: driverData.criminalRecord === 'yes'
-        },
-        contact: {
-          email: contactData.email,
-          phone: contactData.phone,
-          idNumber: contactData.idNumber
-        },
-        coverage: {
-          coverType: coverageData.coverType,
-          excess: parseFloat(coverageData.excess) || 0,
-          additionalCover: coverageData.additionalCover
-        }
+          mmCode: vehicleData.mmCode,
+          modified: vehicleData.modified,
+          category: vehicleData.category,
+          colour: vehicleData.colour,
+          engineSize: parseFloat(vehicleData.engineSize) || 0,
+          financed: vehicleData.financed,
+          owner: vehicleData.owner,
+          status: vehicleData.status,
+          partyIsRegularDriver: vehicleData.partyIsRegularDriver,
+          accessories: vehicleData.accessories,
+          accessoriesAmount: parseInt(vehicleData.accessoriesAmount) || 0,
+          retailValue: parseInt(vehicleData.retailValue) || 0,
+          marketValue: parseInt(vehicleData.marketValue) || 0,
+          insuredValueType: vehicleData.insuredValueType,
+          useType: vehicleData.useType,
+          overnightParkingSituation: vehicleData.overnightParkingSituation,
+          coverCode: vehicleData.coverCode,
+          address: {
+            addressLine: vehicleData.addressLine,
+            postalCode: parseInt(vehicleData.postalCode) || 0,
+            suburb: vehicleData.suburb,
+            latitude: parseFloat(vehicleData.latitude) || 0,
+            longitude: parseFloat(vehicleData.longitude) || 0
+          },
+          regularDriver: {
+            maritalStatus: driverData.maritalStatus,
+            currentlyInsured: driverData.currentlyInsured === 'true',
+            yearsWithoutClaims: parseInt(driverData.yearsWithoutClaims) || 0,
+            relationToPolicyHolder: driverData.relationToPolicyHolder,
+            emailAddress: contactData.email,
+            mobileNumber: contactData.phone,
+            idNumber: contactData.idNumber,
+            prvInsLosses: parseInt(driverData.prvInsLosses) || 0,
+            licenseIssueDate: driverData.licenseIssueDate,
+            dateOfBirth: driverData.dateOfBirth
+          }
+        }]
       };
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quick-quote`;
@@ -232,15 +304,9 @@ function App() {
         first_name: leadTransferData.firstName,
         last_name: leadTransferData.lastName,
         email: leadTransferData.email,
-        contact_number: leadTransferData.contactNumber,
         id_number: leadTransferData.idNumber,
-        agent_name: leadTransferData.agentName,
-        meta_data: {
-          ...leadTransferData.metaData,
-          quote_reference: quoteResult?.data?.quoteId,
-          vehicle_info: vehicleData,
-          coverage_info: coverageData
-        }
+        quote_id: leadTransferData.quoteId,
+        contact_number: leadTransferData.contactNumber
       };
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/motor-lead`;
@@ -292,10 +358,12 @@ function App() {
   ];
 
   const isFormValid = () => {
-    return vehicleData.make && vehicleData.model && vehicleData.year &&
+    const errors = validateForm();
+    return errors.length === 0 &&
+           vehicleData.make && vehicleData.model && vehicleData.year &&
            driverData.firstName && driverData.lastName && driverData.age &&
            contactData.email && contactData.phone &&
-           coverageData.coverType;
+           vehicleData.coverCode;
   };
 
   return (
@@ -310,6 +378,18 @@ function App() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Quick Quotation</h1>
             <p className="text-gray-600">Get your motor insurance quote in minutes</p>
           </div>
+
+          {/* Validation Errors */}
+          {validationErrors.length > 0 && (
+            <div className="bg-red-50 border border-red-200 p-4 rounded-lg mb-6">
+              <h3 className="text-red-900 font-semibold mb-2">Please fix the following errors:</h3>
+              <ul className="list-disc list-inside text-red-700">
+                {validationErrors.map((error, index) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Navigation Tabs */}
           <div className="flex flex-wrap justify-center mb-8 bg-white rounded-lg shadow-sm p-2">
@@ -347,7 +427,7 @@ function App() {
                       value={vehicleData.make}
                       onChange={(e) => setVehicleData(prev => ({ ...prev, make: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="e.g., Toyota"
+                      placeholder="e.g., Volkswagen"
                     />
                   </div>
 
@@ -358,7 +438,7 @@ function App() {
                       value={vehicleData.model}
                       onChange={(e) => setVehicleData(prev => ({ ...prev, model: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="e.g., Corolla"
+                      placeholder="e.g., Polo Tsi 1.2 Comfortline"
                     />
                   </div>
 
@@ -369,7 +449,7 @@ function App() {
                       value={vehicleData.year}
                       onChange={(e) => setVehicleData(prev => ({ ...prev, year: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="2020"
+                      placeholder="2019"
                       min="1990"
                       max="2025"
                     />
@@ -378,125 +458,225 @@ function App() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Engine Size</label>
                     <input
-                      type="text"
+                      type="number"
+                      step="0.1"
                       value={vehicleData.engineSize}
                       onChange={(e) => setVehicleData(prev => ({ ...prev, engineSize: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="e.g., 1.6L"
+                      placeholder="1.2"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Fuel Type</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">MM Code</label>
+                    <input
+                      type="text"
+                      value={vehicleData.mmCode}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, mmCode: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="00815170"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
                     <select
-                      value={vehicleData.fuelType}
-                      onChange={(e) => setVehicleData(prev => ({ ...prev, fuelType: e.target.value }))}
+                      value={vehicleData.category}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, category: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     >
-                      <option value="">Select fuel type</option>
-                      <option value="petrol">Petrol</option>
-                      <option value="diesel">Diesel</option>
-                      <option value="hybrid">Hybrid</option>
-                      <option value="electric">Electric</option>
+                      <option value="">Select category</option>
+                      <option value="HB">Hatchback (HB)</option>
+                      <option value="SD">Sedan (SD)</option>
+                      <option value="SW">Station Wagon (SW)</option>
+                      <option value="SUV">SUV</option>
+                      <option value="BK">Bakkie (BK)</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Transmission</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Colour</label>
+                    <input
+                      type="text"
+                      value={vehicleData.colour}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, colour: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="White"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Modified</label>
                     <select
-                      value={vehicleData.transmission}
-                      onChange={(e) => setVehicleData(prev => ({ ...prev, transmission: e.target.value }))}
+                      value={vehicleData.modified}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, modified: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     >
-                      <option value="">Select transmission</option>
-                      <option value="manual">Manual</option>
-                      <option value="automatic">Automatic</option>
+                      <option value="N">No</option>
+                      <option value="Y">Yes</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle Type</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Financed</label>
                     <select
-                      value={vehicleData.vehicleType}
-                      onChange={(e) => setVehicleData(prev => ({ ...prev, vehicleType: e.target.value }))}
+                      value={vehicleData.financed}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, financed: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     >
-                      <option value="">Select vehicle type</option>
-                      <option value="sedan">Sedan</option>
-                      <option value="hatchback">Hatchback</option>
-                      <option value="suv">SUV</option>
-                      <option value="bakkie">Bakkie</option>
-                      <option value="coupe">Coupe</option>
+                      <option value="N">No</option>
+                      <option value="Y">Yes</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle Use</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Owner</label>
                     <select
-                      value={vehicleData.vehicleUse}
-                      onChange={(e) => setVehicleData(prev => ({ ...prev, vehicleUse: e.target.value }))}
+                      value={vehicleData.owner}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, owner: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     >
-                      <option value="">Select vehicle use</option>
-                      <option value="private">Private</option>
-                      <option value="business">Business</option>
-                      <option value="commercial">Commercial</option>
+                      <option value="Y">Yes</option>
+                      <option value="N">No</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Parking Location</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Use Type</label>
                     <select
-                      value={vehicleData.parkingLocation}
-                      onChange={(e) => setVehicleData(prev => ({ ...prev, parkingLocation: e.target.value }))}
+                      value={vehicleData.useType}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, useType: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     >
-                      <option value="">Select parking location</option>
-                      <option value="garage">Garage</option>
-                      <option value="driveway">Driveway</option>
-                      <option value="street">Street</option>
-                      <option value="secure_parking">Secure Parking</option>
+                      <option value="">Select use type</option>
+                      <option value="Private">Private</option>
+                      <option value="Business">Business</option>
+                      <option value="Commercial">Commercial</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Value (R)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Overnight Parking</label>
+                    <select
+                      value={vehicleData.overnightParkingSituation}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, overnightParkingSituation: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    >
+                      <option value="">Select parking situation</option>
+                      <option value="Garage">Garage</option>
+                      <option value="Driveway">Driveway</option>
+                      <option value="Street">Street</option>
+                      <option value="Secure Parking">Secure Parking</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Accessories</label>
+                    <select
+                      value={vehicleData.accessories}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, accessories: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    >
+                      <option value="N">No</option>
+                      <option value="Y">Yes</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Accessories Amount (R)</label>
                     <input
                       type="number"
-                      value={vehicleData.estimatedValue}
-                      onChange={(e) => setVehicleData(prev => ({ ...prev, estimatedValue: e.target.value }))}
+                      value={vehicleData.accessoriesAmount}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, accessoriesAmount: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="250000"
+                      placeholder="20000"
+                      disabled={vehicleData.accessories === 'N'}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Retail Value (R)</label>
+                    <input
+                      type="number"
+                      value={vehicleData.retailValue}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, retailValue: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="200000"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Market Value (R)</label>
+                    <input
+                      type="number"
+                      value={vehicleData.marketValue}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, marketValue: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="180000"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">Security Features</label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {['Alarm', 'Immobilizer', 'Tracking Device', 'Central Locking', 'Security Gates', 'Armed Response'].map((feature) => (
-                      <label key={feature} className="flex items-center space-x-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={vehicleData.securityFeatures.includes(feature)}
-                          onChange={(e) => handleSecurityFeatureChange(feature, e.target.checked)}
-                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-700">{feature}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Address Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Address Line</label>
+                      <input
+                        type="text"
+                        value={vehicleData.addressLine}
+                        onChange={(e) => setVehicleData(prev => ({ ...prev, addressLine: e.target.value }))}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        placeholder="123 Main Street"
+                      />
+                    </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Modifications</label>
-                  <textarea
-                    value={vehicleData.modifications}
-                    onChange={(e) => setVehicleData(prev => ({ ...prev, modifications: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    rows={3}
-                    placeholder="Describe any modifications to the vehicle..."
-                  />
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Postal Code</label>
+                      <input
+                        type="number"
+                        value={vehicleData.postalCode}
+                        onChange={(e) => setVehicleData(prev => ({ ...prev, postalCode: e.target.value }))}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        placeholder="2196"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Suburb</label>
+                      <input
+                        type="text"
+                        value={vehicleData.suburb}
+                        onChange={(e) => setVehicleData(prev => ({ ...prev, suburb: e.target.value }))}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        placeholder="Sandton"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Latitude</label>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={vehicleData.latitude}
+                        onChange={(e) => setVehicleData(prev => ({ ...prev, latitude: e.target.value }))}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        placeholder="-26.10757"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Longitude</label>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={vehicleData.longitude}
+                        onChange={(e) => setVehicleData(prev => ({ ...prev, longitude: e.target.value }))}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        placeholder="28.0567"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -514,7 +694,7 @@ function App() {
                       value={driverData.firstName}
                       onChange={(e) => setDriverData(prev => ({ ...prev, firstName: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="John"
+                      placeholder="Peter"
                     />
                   </div>
 
@@ -530,12 +710,14 @@ function App() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Age *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Age * (18-100)</label>
                     <input
                       type="number"
                       value={driverData.age}
                       onChange={(e) => setDriverData(prev => ({ ...prev, age: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                        driverData.age && !validateAge(driverData.age) ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
                       placeholder="30"
                       min="18"
                       max="100"
@@ -543,86 +725,74 @@ function App() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">License Type</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Marital Status</label>
                     <select
-                      value={driverData.licenseType}
-                      onChange={(e) => setDriverData(prev => ({ ...prev, licenseType: e.target.value }))}
+                      value={driverData.maritalStatus}
+                      onChange={(e) => setDriverData(prev => ({ ...prev, maritalStatus: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     >
-                      <option value="">Select license type</option>
-                      <option value="code_b">Code B (Light Motor Vehicle)</option>
-                      <option value="code_c">Code C (Heavy Motor Vehicle)</option>
-                      <option value="code_eb">Code EB (Light Motor Vehicle with Trailer)</option>
-                      <option value="code_ec">Code EC (Heavy Motor Vehicle with Trailer)</option>
+                      <option value="">Select marital status</option>
+                      <option value="Single">Single</option>
+                      <option value="Married">Married</option>
+                      <option value="Divorced">Divorced</option>
+                      <option value="Widowed">Widowed</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Years Licensed</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Currently Insured</label>
+                    <select
+                      value={driverData.currentlyInsured}
+                      onChange={(e) => setDriverData(prev => ({ ...prev, currentlyInsured: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    >
+                      <option value="true">Yes</option>
+                      <option value="false">No</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Years Without Claims</label>
                     <input
                       type="number"
-                      value={driverData.yearsLicensed}
-                      onChange={(e) => setDriverData(prev => ({ ...prev, yearsLicensed: e.target.value }))}
+                      value={driverData.yearsWithoutClaims}
+                      onChange={(e) => setDriverData(prev => ({ ...prev, yearsWithoutClaims: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="10"
+                      placeholder="0"
                       min="0"
                       max="50"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Previous Claims</label>
-                    <select
-                      value={driverData.previousClaims}
-                      onChange={(e) => setDriverData(prev => ({ ...prev, previousClaims: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    >
-                      <option value="">Select claims history</option>
-                      <option value="none">No previous claims</option>
-                      <option value="1">1 claim</option>
-                      <option value="2">2 claims</option>
-                      <option value="3+">3 or more claims</option>
-                    </select>
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Criminal Record</label>
-                    <div className="flex space-x-4">
-                      <label className="flex items-center space-x-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="criminalRecord"
-                          value="no"
-                          checked={driverData.criminalRecord === 'no'}
-                          onChange={(e) => setDriverData(prev => ({ ...prev, criminalRecord: e.target.value }))}
-                          className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-700">No</span>
-                      </label>
-                      <label className="flex items-center space-x-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="criminalRecord"
-                          value="yes"
-                          checked={driverData.criminalRecord === 'yes'}
-                          onChange={(e) => setDriverData(prev => ({ ...prev, criminalRecord: e.target.value }))}
-                          className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-700">Yes</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t pt-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Agent Name</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Previous Insurance Losses</label>
                     <input
-                      type="text"
-                      value={driverData.agentName}
-                      onChange={(e) => setDriverData(prev => ({ ...prev, agentName: e.target.value }))}
+                      type="number"
+                      value={driverData.prvInsLosses}
+                      onChange={(e) => setDriverData(prev => ({ ...prev, prvInsLosses: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="Agent handling this quote"
+                      placeholder="0"
+                      min="0"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">License Issue Date</label>
+                    <input
+                      type="date"
+                      value={driverData.licenseIssueDate}
+                      onChange={(e) => setDriverData(prev => ({ ...prev, licenseIssueDate: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Date of Birth (Auto-calculated)</label>
+                    <input
+                      type="date"
+                      value={driverData.dateOfBirth}
+                      readOnly
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
                     />
                   </div>
                 </div>
@@ -642,7 +812,7 @@ function App() {
                       value={contactData.email}
                       onChange={(e) => setContactData(prev => ({ ...prev, email: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="john@example.com"
+                      placeholder="peterSmith007@pineapple.co.za"
                     />
                   </div>
 
@@ -653,19 +823,25 @@ function App() {
                       value={contactData.phone}
                       onChange={(e) => setContactData(prev => ({ ...prev, phone: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="0123456789"
+                      placeholder="0737111119"
                     />
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">ID Number</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">ID Number (13 digits)</label>
                     <input
                       type="text"
                       value={contactData.idNumber}
                       onChange={(e) => setContactData(prev => ({ ...prev, idNumber: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="9001010000000"
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                        contactData.idNumber && !validateIdNumber(contactData.idNumber) ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
+                      placeholder="9510025800086"
+                      maxLength={13}
                     />
+                    {contactData.idNumber && !validateIdNumber(contactData.idNumber) && (
+                      <p className="text-red-600 text-sm mt-1">ID Number must be exactly 13 digits</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -680,48 +856,66 @@ function App() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Cover Type *</label>
                     <select
-                      value={coverageData.coverType}
-                      onChange={(e) => setCoverageData(prev => ({ ...prev, coverType: e.target.value }))}
+                      value={vehicleData.coverCode}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, coverCode: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     >
                       <option value="">Select cover type</option>
-                      <option value="comprehensive">Comprehensive</option>
-                      <option value="third_party">Third Party</option>
-                      <option value="third_party_fire_theft">Third Party, Fire & Theft</option>
+                      <option value="Comprehensive">Comprehensive</option>
+                      <option value="Third Party">Third Party</option>
+                      <option value="Third Party Fire and Theft">Third Party Fire and Theft</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Excess Amount (R)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Insured Value Type</label>
                     <select
-                      value={coverageData.excess}
-                      onChange={(e) => setCoverageData(prev => ({ ...prev, excess: e.target.value }))}
+                      value={vehicleData.insuredValueType}
+                      onChange={(e) => setVehicleData(prev => ({ ...prev, insuredValueType: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     >
-                      <option value="">Select excess</option>
-                      <option value="0">R0</option>
-                      <option value="2500">R2,500</option>
-                      <option value="5000">R5,000</option>
-                      <option value="7500">R7,500</option>
-                      <option value="10000">R10,000</option>
+                      <option value="Retail">Retail</option>
+                      <option value="Market">Market</option>
+                      <option value="Agreed">Agreed</option>
                     </select>
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">Additional Cover Options</label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {['Roadside Assistance', 'Rental Car', 'Personal Accident', 'Windscreen Cover', 'Hail Damage', 'Tyre & Rim'].map((cover) => (
-                      <label key={cover} className="flex items-center space-x-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={coverageData.additionalCover.includes(cover)}
-                          onChange={(e) => handleAdditionalCoverChange(cover, e.target.checked)}
-                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-700">{cover}</span>
-                      </label>
-                    ))}
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Agent Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Agent Name</label>
+                      <input
+                        type="text"
+                        value={coverageData.agentName}
+                        onChange={(e) => setCoverageData(prev => ({ ...prev, agentName: e.target.value }))}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        placeholder="Agent handling this quote"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Application User (Optional)</label>
+                      <input
+                        type="text"
+                        value={coverageData.applicationUser}
+                        onChange={(e) => setCoverageData(prev => ({ ...prev, applicationUser: e.target.value }))}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        placeholder="Agent Fullname"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Application User Email (Optional)</label>
+                      <input
+                        type="email"
+                        value={coverageData.applicationUserEmail}
+                        onChange={(e) => setCoverageData(prev => ({ ...prev, applicationUserEmail: e.target.value }))}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        placeholder="agent@example.com"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -875,12 +1069,13 @@ function App() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Agent Name</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Quote ID</label>
                     <input
                       type="text"
-                      value={leadTransferData.agentName}
-                      onChange={(e) => setLeadTransferData(prev => ({ ...prev, agentName: e.target.value }))}
+                      value={leadTransferData.quoteId}
+                      onChange={(e) => setLeadTransferData(prev => ({ ...prev, quoteId: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="Auto-populated from quote"
                     />
                   </div>
 
@@ -891,6 +1086,17 @@ function App() {
                       value={leadTransferData.source}
                       onChange={(e) => setLeadTransferData(prev => ({ ...prev, source: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Agent Name</label>
+                    <input
+                      type="text"
+                      value={coverageData.agentName}
+                      readOnly
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                      placeholder="From coverage page"
                     />
                   </div>
                 </div>

@@ -48,6 +48,7 @@ interface QuoteResponse {
   data?: {
     premium?: number;
     excess?: number;
+    monthly_premium?: number;
     quote_id?: string;
     quoteId?: string; // fallback for different response formats
   };
@@ -57,6 +58,7 @@ interface QuoteResponse {
 interface LeadTransferResponse {
   success: boolean;
   data?: {
+    message?: string;
     uuid?: string;
     redirect_url?: string;
   };
@@ -122,6 +124,7 @@ function App() {
   const [quoteResult, setQuoteResult] = useState<QuoteResponse | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
+  const [leadTransferred, setLeadTransferred] = useState(false);
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
 
   // Validation functions
@@ -376,12 +379,14 @@ function App() {
 
       if (result.success) {
         alert('Lead transferred successfully!');
+        setLeadTransferred(true);
         if (result.data?.redirect_url) {
           window.open(result.data.redirect_url, '_blank');
         }
       } else {
         alert(`Lead transfer failed: ${result.error}`);
       }
+      
     } catch (error) {
       console.error('Lead transfer error:', error);
       alert(`Lead transfer error: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -858,7 +863,7 @@ function App() {
       {quoteResult?.success ? (
         <div className="bg-green-50 border border-green-200 rounded-lg p-6">
           <h3 className="text-xl font-semibold text-green-800 mb-6">Quote Successful!</h3>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             {quoteResult.data?.premium && (
               <div className="bg-white rounded-lg p-6 border border-green-200">
@@ -868,6 +873,18 @@ function App() {
                     <span className="text-lg font-medium text-gray-700">Monthly Premium</span>
                   </div>
                   <span className="text-2xl font-bold text-green-600">R{quoteResult.data.premium.toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+
+            {quoteResult.data?.monthly_premium && (
+              <div className="bg-white rounded-lg p-6 border border-green-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="w-5 h-5 text-green-600" />
+                    <span className="text-lg font-medium text-gray-700">Monthly Premium</span>
+                  </div>
+                  <span className="text-2xl font-bold text-green-600">R{quoteResult.data.monthly_premium.toLocaleString()}</span>
                 </div>
               </div>
             )}
@@ -884,6 +901,16 @@ function App() {
               </div>
             )}
           </div>
+
+          {leadTransferred && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="w-5 h-5 text-blue-600" />
+                <span className="text-blue-800 font-medium">Lead Successfully Transferred!</span>
+              </div>
+              <p className="text-blue-700 text-sm mt-1">Your information has been sent to Pineapple for processing.</p>
+            </div>
+          )}
 
           <div className="bg-white rounded-lg p-6 mb-6 border border-gray-200">
             <h4 className="font-semibold text-gray-800 mb-4 flex items-center">
@@ -907,7 +934,7 @@ function App() {
             </div>
           </div>
 
-          <div className="flex justify-center">
+          {!leadTransferred && <div className="flex justify-center">
             <button
               onClick={handleLeadTransfer}
               disabled={isTransferring}
@@ -925,7 +952,7 @@ function App() {
                 </>
               )}
             </button>
-          </div>
+          </div>}
         </div>
       ) : (
         <div className="bg-red-50 border border-red-200 rounded-lg p-6">
@@ -1019,6 +1046,7 @@ function App() {
                 <button
                   onClick={() => {
                     setCurrentStep(1);
+                    setLeadTransferred(false);
                     setQuoteResult(null);
                     setValidationErrors({});
                   }}

@@ -808,36 +808,6 @@ function App() {
             />
           </div>
         </div>
-      </div>
-
-      <div className="flex justify-center">
-        <button
-          onClick={handleQuoteSubmit}
-          disabled={isSubmitting}
-          className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-8 py-4 rounded-lg font-semibold text-lg transition-colors duration-200 flex items-center space-x-2"
-        >
-          {isSubmitting ? (
-            <>
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              <span>Getting Quote...</span>
-            </>
-          ) : (
-            <>
-              <DollarSign className="w-5 h-5" />
-              <span>Get Quote</span>
-            </>
-          )}
-        </button>
-      </div>
-    </div>
-  );
-
-  const renderResultsStep = () => (
-    <div className="space-y-6">
-      <div className="text-center mb-8">
-        {quoteResult?.success ? (
-          <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
-        ) : (
           <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4" />
         )}
         <h2 className="text-3xl font-bold text-gray-900 mb-2">Quote Results</h2>
@@ -868,6 +838,37 @@ function App() {
                 {agentData.agentEmail && <p><strong>Agent Email:</strong> {agentData.agentEmail}</p>}
               </div>
             </div>
+          </div>
+
+          {/* Premium and Excess Display */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {quoteResult.data && (Array.isArray(quoteResult.data) ? quoteResult.data?.premium : quoteResult.data.premium) && (
+              <div className="bg-white rounded-lg p-6 border border-green-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="w-5 h-5 text-green-600" />
+                    <span className="text-lg font-medium text-gray-700">Premium</span>
+                  </div>
+                  <span className="text-2xl font-bold text-green-600">
+                    R{Math.round(Array.isArray(quoteResult.data) ? quoteResult.data.premium || 0 : quoteResult.data.premium || 0).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {quoteResult.data && (Array.isArray(quoteResult.data) ? quoteResult.data?.excess : quoteResult.data.excess) && (
+              <div className="bg-white rounded-lg p-6 border border-blue-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Shield className="w-5 h-5 text-blue-600" />
+                    <span className="text-lg font-medium text-gray-700">Excess</span>
+                  </div>
+                  <span className="text-xl font-semibold text-blue-600">
+                    R{(Array.isArray(quoteResult.data) ? quoteResult.data.excess || 0 : quoteResult.data.excess || 0).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">

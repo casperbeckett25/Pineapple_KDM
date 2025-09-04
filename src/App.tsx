@@ -48,7 +48,8 @@ interface QuoteResponse {
   data?: {
     premium?: number;
     excess?: number;
-    quoteId?: string;
+    quote_id?: string;
+    quoteId?: string; // fallback for different response formats
   };
   error?: string;
 }
@@ -345,7 +346,7 @@ function App() {
         last_name: driverData.lastName,
         email: vehicleData.regularDriver.emailAddress,
         id_number: vehicleData.regularDriver.idNumber,
-        quote_id: quoteResult?.data?.quoteId || '',
+        quote_id: quoteResult?.data?.quote_id || quoteResult?.data?.quoteId || '',
         contact_number: vehicleData.regularDriver.mobileNumber,
         application_user: agentData.agentName || '',
         application_user_email: agentData.agentEmail || ''
@@ -375,8 +376,8 @@ function App() {
 
       if (result.success) {
         alert('Lead transferred successfully!');
-        if (result.redirect_url) {
-          window.open(result.redirect_url, '_blank');
+        if (result.data?.redirect_url) {
+          window.open(result.data.redirect_url, '_blank');
         }
       } else {
         alert(`Lead transfer failed: ${result.error}`);
@@ -897,7 +898,9 @@ function App() {
               </div>
               <div>
                 <p><strong>ID Number:</strong> {vehicleData.regularDriver.idNumber}</p>
-                {quoteResult.data?.quoteId && <p><strong>Quote ID:</strong> {quoteResult.data.quoteId}</p>}
+                {(quoteResult.data?.quote_id || quoteResult.data?.quoteId) && (
+                  <p><strong>Quote ID:</strong> {quoteResult.data.quote_id || quoteResult.data.quoteId}</p>
+                )}
                 {agentData.agentName && <p><strong>Agent:</strong> {agentData.agentName}</p>}
                 {agentData.agentEmail && <p><strong>Agent Email:</strong> {agentData.agentEmail}</p>}
               </div>

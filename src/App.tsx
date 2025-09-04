@@ -847,6 +847,28 @@ function App() {
       {quoteResult?.success ? (
         <div className="bg-green-50 border border-green-200 rounded-lg p-6">
           <h3 className="text-xl font-semibold text-green-800 mb-6">Quote Successful!</h3>
+          
+          <div className="bg-white rounded-lg p-6 border border-gray-200">
+            <h4 className="font-semibold text-gray-800 mb-4 flex items-center">
+              <User className="w-5 h-5 mr-2" />
+              Lead Transfer Information
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+              <div>
+                <p><strong>Name:</strong> {driverData.firstName} {driverData.lastName}</p>
+                <p><strong>Email:</strong> {vehicleData.regularDriver.emailAddress}</p>
+                <p><strong>Contact:</strong> {vehicleData.regularDriver.mobileNumber}</p>
+              </div>
+              <div>
+                <p><strong>ID Number:</strong> {vehicleData.regularDriver.idNumber}</p>
+                {((Array.isArray(quoteResult.data) && (quoteResult.data[0]?.quote_id || quoteResult.data[0]?.quoteId)) || (!Array.isArray(quoteResult.data) && (quoteResult.data?.quote_id || quoteResult.data?.quoteId))) && (
+                  <p><strong>Quote ID:</strong> {Array.isArray(quoteResult.data) ? (quoteResult.data[0]?.quote_id || quoteResult.data[0]?.quoteId) : (quoteResult.data?.quote_id || quoteResult.data?.quoteId)}</p>
+                )}
+                {agentData.agentName && <p><strong>Agent:</strong> {agentData.agentName}</p>}
+                {agentData.agentEmail && <p><strong>Agent Email:</strong> {agentData.agentEmail}</p>}
+              </div>
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             {((Array.isArray(quoteResult.data) && quoteResult.data[0]?.premium) || (!Array.isArray(quoteResult.data) && quoteResult.data?.premium)) && (
@@ -864,7 +886,7 @@ function App() {
             )}
 
             {((Array.isArray(quoteResult.data) && quoteResult.data[0]?.excess) || (!Array.isArray(quoteResult.data) && quoteResult.data?.excess)) && (
-              <div className="bg-white rounded-lg p-6 border border-green-200">
+              <div className="bg-white rounded-lg p-6 border border-blue-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <Shield className="w-5 h-5 text-blue-600" />
@@ -887,28 +909,6 @@ function App() {
               <p className="text-blue-700 text-sm mt-1">Your information has been sent to Pineapple for processing.</p>
             </div>
           )}
-
-          <div className="bg-white rounded-lg p-6 mb-6 border border-gray-200">
-            <h4 className="font-semibold text-gray-800 mb-4 flex items-center">
-              <User className="w-5 h-5 mr-2" />
-              Lead Transfer Information
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
-              <div>
-                <p><strong>Name:</strong> {driverData.firstName} {driverData.lastName}</p>
-                <p><strong>Email:</strong> {vehicleData.regularDriver.emailAddress}</p>
-                <p><strong>Contact:</strong> {vehicleData.regularDriver.mobileNumber}</p>
-              </div>
-              <div>
-                <p><strong>ID Number:</strong> {vehicleData.regularDriver.idNumber}</p>
-                {((Array.isArray(quoteResult.data) && (quoteResult.data[0]?.quote_id || quoteResult.data[0]?.quoteId)) || (!Array.isArray(quoteResult.data) && (quoteResult.data?.quote_id || quoteResult.data?.quoteId))) && (
-                  <p><strong>Quote ID:</strong> {Array.isArray(quoteResult.data) ? (quoteResult.data[0]?.quote_id || quoteResult.data[0]?.quoteId) : (quoteResult.data?.quote_id || quoteResult.data?.quoteId)}</p>
-                )}
-                {agentData.agentName && <p><strong>Agent:</strong> {agentData.agentName}</p>}
-                {agentData.agentEmail && <p><strong>Agent Email:</strong> {agentData.agentEmail}</p>}
-              </div>
-            </div>
-          </div>
 
           {!leadTransferred && <div className="flex justify-center">
             <button

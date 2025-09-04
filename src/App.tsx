@@ -805,9 +805,15 @@ function App() {
               onChange={(e) => handleInputChange('agentEmail', e.target.value, 'agent')}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Enter agent email"
-            />
-          </div>
-        </div>
+    </div>
+  );
+
+  const renderResultsStep = () => (
+    <div className="space-y-6">
+      <div className="text-center mb-8">
+        {quoteResult?.success ? (
+          <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
+        ) : (
           <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4" />
         )}
         <h2 className="text-3xl font-bold text-gray-900 mb-2">Quote Results</h2>

@@ -48,8 +48,40 @@ Deno.serve(async (req: Request) => {
       .insert({
         source: requestData.source || 'KodomBranchOne',
         external_reference_id: requestData.externalReferenceId || '',
-        vehicle_data: requestData.vehicles || [],
-        request_data: requestData,
+        vehicle_year: requestData.vehicles?.[0]?.year || null,
+        vehicle_make: requestData.vehicles?.[0]?.make || '',
+        vehicle_model: requestData.vehicles?.[0]?.model || '',
+        mm_code: requestData.vehicles?.[0]?.mmCode || null,
+        modified: requestData.vehicles?.[0]?.modified || 'N',
+        category: requestData.vehicles?.[0]?.category || null,
+        colour: requestData.vehicles?.[0]?.colour || null,
+        engine_size: requestData.vehicles?.[0]?.engineSize || null,
+        financed: requestData.vehicles?.[0]?.financed || 'N',
+        owner: requestData.vehicles?.[0]?.owner || 'Y',
+        party_is_regular_driver: requestData.vehicles?.[0]?.partyIsRegularDriver || 'Y',
+        accessories: requestData.vehicles?.[0]?.accessories || 'N',
+        accessories_amount: requestData.vehicles?.[0]?.accessoriesAmount || 0,
+        retail_value: requestData.vehicles?.[0]?.retailValue || null,
+        market_value: requestData.vehicles?.[0]?.marketValue || null,
+        insured_value_type: requestData.vehicles?.[0]?.insuredValueType || 'Retail',
+        use_type: requestData.vehicles?.[0]?.useType || 'Private',
+        overnight_parking_situation: requestData.vehicles?.[0]?.overnightParkingSituation || null,
+        cover_code: requestData.vehicles?.[0]?.coverCode || 'Comprehensive',
+        address_line: requestData.vehicles?.[0]?.address?.addressLine || null,
+        postal_code: requestData.vehicles?.[0]?.address?.postalCode || null,
+        suburb: requestData.vehicles?.[0]?.address?.suburb || null,
+        latitude: requestData.vehicles?.[0]?.address?.latitude || null,
+        longitude: requestData.vehicles?.[0]?.address?.longitude || null,
+        marital_status: requestData.vehicles?.[0]?.regularDriver?.maritalStatus || null,
+        currently_insured: requestData.vehicles?.[0]?.regularDriver?.currentlyInsured || false,
+        years_without_claims: requestData.vehicles?.[0]?.regularDriver?.yearsWithoutClaims || 0,
+        relation_to_policy_holder: requestData.vehicles?.[0]?.regularDriver?.relationToPolicyHolder || 'Self',
+        email_address: requestData.vehicles?.[0]?.regularDriver?.emailAddress || null,
+        mobile_number: requestData.vehicles?.[0]?.regularDriver?.mobileNumber || null,
+        driver_id_number: requestData.vehicles?.[0]?.regularDriver?.idNumber || null,
+        prv_ins_losses: requestData.vehicles?.[0]?.regularDriver?.prvInsLosses || 0,
+        license_issue_date: requestData.vehicles?.[0]?.regularDriver?.licenseIssueDate || null,
+        date_of_birth: requestData.vehicles?.[0]?.regularDriver?.dateOfBirth || null,
         status: 'pending'
       })
       .select()
@@ -98,10 +130,10 @@ Deno.serve(async (req: Request) => {
     // Extract quote information if successful
     if (response.ok && typeof responseData === 'object') {
       if (responseData.quote_id || responseData.quoteId) {
-        updateData.quote_id = responseData.quote_id || responseData.quoteId;
+        updateData.external_reference_id = responseData.quote_id || responseData.quoteId;
       }
       if (responseData.premium) {
-        updateData.premium = responseData.premium;
+        updateData.quote_amount = responseData.premium;
       }
       if (responseData.excess) {
         updateData.excess = responseData.excess;

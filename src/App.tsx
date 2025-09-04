@@ -48,11 +48,13 @@ interface QuoteResponse {
   data?: {
     premium?: number;
     excess?: number;
-    monthly_premium?: number;
     quote_id?: string;
-    quoteId?: string; // fallback for different response formats
+    quoteId?: string;
   }[] | {
-    quoteId?: string; // fallback for different response formats
+    premium?: number;
+    excess?: number;
+    quote_id?: string;
+    quoteId?: string;
   };
   error?: string;
 }
@@ -318,6 +320,7 @@ function App() {
       if (responseText.trim()) {
         try {
           result = JSON.parse(responseText);
+          console.log('Quote API Response:', result);
         } catch {
           result = { success: false, error: 'Invalid response format' };
         }
@@ -441,17 +444,6 @@ function App() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">MM Code</label>
-          <input
-            type="text"
-            value={vehicleData.mmCode}
-            onChange={(e) => handleInputChange('mmCode', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="e.g., 00815170"
-          />
-        </div>
-
-        <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
           <select
             value={vehicleData.category}
@@ -495,16 +487,6 @@ function App() {
             type="number"
             value={vehicleData.retailValue}
             onChange={(e) => handleInputChange('retailValue', parseInt(e.target.value) || 0)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Market Value (R)</label>
-          <input
-            type="number"
-            value={vehicleData.marketValue}
-            onChange={(e) => handleInputChange('marketValue', parseInt(e.target.value) || 0)}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
@@ -867,38 +849,30 @@ function App() {
           <h3 className="text-xl font-semibold text-green-800 mb-6">Quote Successful!</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {(Array.isArray(quoteResult.data) ? quoteResult.data[0]?.premium : quoteResult.data?.premium) && (
+            {((Array.isArray(quoteResult.data) && quoteResult.data[0]?.premium) || (!Array.isArray(quoteResult.data) && quoteResult.data?.premium)) && (
               <div className="bg-white rounded-lg p-6 border border-green-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <DollarSign className="w-5 h-5 text-green-600" />
                     <span className="text-lg font-medium text-gray-700">Premium</span>
                   </div>
-                  <span className="text-2xl font-bold text-green-600">R{(Array.isArray(quoteResult.data) ? quoteResult.data[0]?.premium : quoteResult.data?.premium)?.toLocaleString()}</span>
+                  <span className="text-2xl font-bold text-green-600">
+                    R{Math.round(Array.isArray(quoteResult.data) ? quoteResult.data[0]?.premium || 0 : quoteResult.data?.premium || 0).toLocaleString()}
+                  </span>
                 </div>
               </div>
             )}
 
-            {(Array.isArray(quoteResult.data) ? quoteResult.data[0]?.monthly_premium : quoteResult.data?.monthly_premium) && (
+            {((Array.isArray(quoteResult.data) && quoteResult.data[0]?.excess) || (!Array.isArray(quoteResult.data) && quoteResult.data?.excess)) && (
               <div className="bg-white rounded-lg p-6 border border-green-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <DollarSign className="w-5 h-5 text-green-600" />
-                    <span className="text-lg font-medium text-gray-700">Monthly Premium</span>
-                  </div>
-                  <span className="text-2xl font-bold text-green-600">R{(Array.isArray(quoteResult.data) ? quoteResult.data[0]?.monthly_premium : quoteResult.data?.monthly_premium)?.toLocaleString()}</span>
-                </div>
-              </div>
-            )}
-
-            {(Array.isArray(quoteResult.data) ? quoteResult.data[0]?.excess : quoteResult.data?.excess) && (
-              <div className="bg-white rounded-lg p-6 border border-blue-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <Shield className="w-5 h-5 text-blue-600" />
                     <span className="text-lg font-medium text-gray-700">Excess</span>
                   </div>
-                  <span className="text-xl font-semibold text-blue-600">R{(Array.isArray(quoteResult.data) ? quoteResult.data[0]?.excess : quoteResult.data?.excess)?.toLocaleString()}</span>
+                  <span className="text-xl font-semibold text-blue-600">
+                    R{(Array.isArray(quoteResult.data) ? quoteResult.data[0]?.excess || 0 : quoteResult.data?.excess || 0).toLocaleString()}
+                  </span>
                 </div>
               </div>
             )}
@@ -927,7 +901,7 @@ function App() {
               </div>
               <div>
                 <p><strong>ID Number:</strong> {vehicleData.regularDriver.idNumber}</p>
-                {(Array.isArray(quoteResult.data) ? (quoteResult.data[0]?.quote_id || quoteResult.data[0]?.quoteId) : (quoteResult.data?.quote_id || quoteResult.data?.quoteId)) && (
+                {((Array.isArray(quoteResult.data) && (quoteResult.data[0]?.quote_id || quoteResult.data[0]?.quoteId)) || (!Array.isArray(quoteResult.data) && (quoteResult.data?.quote_id || quoteResult.data?.quoteId))) && (
                   <p><strong>Quote ID:</strong> {Array.isArray(quoteResult.data) ? (quoteResult.data[0]?.quote_id || quoteResult.data[0]?.quoteId) : (quoteResult.data?.quote_id || quoteResult.data?.quoteId)}</p>
                 )}
                 {agentData.agentName && <p><strong>Agent:</strong> {agentData.agentName}</p>}

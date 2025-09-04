@@ -36,32 +36,36 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const api_url = "http://gw.pineapple.co.za/users/motor_lead";
+    const api_url = "http://gw.pineapple.co.za/api/v1/quote/quick-quote";
     const token = "KEY=Qr6Ty8Pw3Nv1Az5Gh7Lc9BmK SECRET=S1dF2gH3jK4lM5nP6qR7tV8wX9yZ0aB1cD2eF3gH4iJ5kL6mN7oP8qR9sT0uV1wX2";
 
     // Get the request body
     const requestData = await req.json();
     
-    // Store the lead in Supabase first
-    const { data: leadData, error: leadError } = await supabase
-      .from('motor_leads')
+    // Update the request data to match API format exactly
+    const apiPayload = {
+      source: "KodomBranchOne",
+      externalReferenceId: requestData.externalReferenceId || requestData.vehicles?.[0]?.regularDriver?.idNumber || '',
+      vehicles: requestData.vehicles || []
+    };
+
+    // Store the quote request in Supabase first
+    const { data: quoteData, error: quoteError } = await supabase
+      .from('quick_quotes')
       .insert({
-        source: requestData.source || 'Kodom_Connect',
-        first_name: requestData.first_name,
-        last_name: requestData.last_name,
-        email: requestData.email,
-        contact_number: requestData.contact_number,
-        id_number: requestData.id_number || '',
-        quote_id: requestData.quote_id || '',
+        source: "KodomBranchOne",
+        external_reference_id: apiPayload.externalReferenceId,
+        vehicle_data: requestData.vehicles || [],
+        request_data: apiPayload,
         status: 'pending'
       })
       .select()
       .single();
 
-    if (leadError) {
-      console.error('Error storing lead:', leadError);
+    if (quoteError) {
+      console.error('Error storing quote request:', quoteError);
       return new Response(
-        JSON.stringify({ error: `Database error: ${leadError.message}` }),
+        JSON.stringify({ error: `Database error: ${quoteError.message}` }),
         {
           status: 500,
           headers: {
@@ -79,7 +83,7 @@ Deno.serve(async (req: Request) => {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
       },
-      body: JSON.stringify(requestData),
+      body: JSON.stringify(apiPayload),
     });
 
     const responseText = await response.text();
@@ -92,35 +96,33 @@ Deno.serve(async (req: Request) => {
       responseData = responseText;
     }
 
-    // Update the lead record with API response
+    // Update the quote record with API response
     const updateData: any = {
       api_response: responseData,
       status: response.ok ? 'success' : 'error'
     };
 
-    // Extract quote reference and redirect URL if successful
-    if (response.ok && typeof responseData === 'object' && responseData.success === true && responseData.data) {
-      if (responseData.data.uuid) {
-        updateData.quote_reference = responseData.data.uuid;
+    // Extract quote information if successful
+    if (response.ok && typeof responseData === 'object') {
+      if (responseData.data?.quoteId) {
+        updateData.quote_id = responseData.data.quoteId;
       }
-      if (responseData.data.redirect_url) {
-        updateData.redirect_url = responseData.data.redirect_url;
+      if (responseData.data?.premium) {
+        updateData.premium = responseData.data.premium;
       }
     }
 
     await supabase
-      .from('motor_leads')
+      .from('quick_quotes')
       .update(updateData)
-      .eq('id', leadData.id);
+      .eq('id', quoteData.id);
 
     // Return structured JSON response
     const structuredResponse = {
       success: response.ok,
       status: response.status,
       data: response.ok ? responseData : null,
-      error: response.ok ? null : (typeof responseData === 'string' ? responseData : responseData?.message || 'API request failed'),
-      quote_reference: updateData.quote_reference || null,
-      redirect_url: updateData.redirect_url || null
+      error: response.ok ? null : (typeof responseData === 'string' ? responseData : responseData?.message || 'API request failed')
     };
 
     return new Response(JSON.stringify(structuredResponse), {
@@ -129,7 +131,7 @@ Deno.serve(async (req: Request) => {
         "Content-Type": "application/json",
         ...corsHeaders,
       },
-    });
+      body: JSON.stringify(leadPayload),
 
   } catch (error) {
     console.error('Function error:', error);

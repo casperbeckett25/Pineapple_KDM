@@ -125,7 +125,37 @@ function App() {
 
   // Validation functions
   const validateIdNumber = (idNumber: string): boolean => {
-    return /^\d{13}$/.test(idNumber);
+    // Check if it's exactly 13 digits
+    if (!/^\d{13}$/.test(idNumber)) {
+      return false;
+    }
+
+    // Basic South African ID number validation
+    const digits = idNumber.split('').map(Number);
+    
+    // Extract date components
+    const year = parseInt(idNumber.substring(0, 2));
+    const month = parseInt(idNumber.substring(2, 4));
+    const day = parseInt(idNumber.substring(4, 6));
+    
+    // Basic date validation
+    if (month < 1 || month > 12 || day < 1 || day > 31) {
+      return false;
+    }
+
+    // Luhn algorithm check
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+      if (i % 2 === 0) {
+        sum += digits[i];
+      } else {
+        const doubled = digits[i] * 2;
+        sum += doubled > 9 ? doubled - 9 : doubled;
+      }
+    }
+    
+    const checkDigit = (10 - (sum % 10)) % 10;
+    return checkDigit === digits[12];
   };
 
   const validateAge = (age: string): boolean => {
@@ -138,6 +168,24 @@ function App() {
     const currentYear = new Date().getFullYear();
     const birthYear = currentYear - parseInt(age);
     return `${birthYear}-01-01`;
+  };
+
+  const extractAgeFromIdNumber = (idNumber: string): number => {
+    if (idNumber.length !== 13) return 0;
+    
+    const year = parseInt(idNumber.substring(0, 2));
+    const currentYear = new Date().getFullYear();
+    const currentCentury = Math.floor(currentYear / 100);
+    
+    // Determine if it's 19xx or 20xx
+    let fullYear;
+    if (year <= (currentYear % 100)) {
+      fullYear = currentCentury * 100 + year;
+    } else {
+      fullYear = (currentCentury - 1) * 100 + year;
+    }
+    
+    return currentYear - fullYear;
   };
 
   const handleInputChange = (field: string, value: any, section?: string) => {
@@ -155,6 +203,14 @@ function App() {
         ...prev,
         regularDriver: { ...prev.regularDriver, [field]: value }
       }));
+      
+      // Auto-populate age when ID number is entered
+      if (field === 'idNumber' && value.length === 13) {
+        const calculatedAge = extractAgeFromIdNumber(value);
+        if (calculatedAge > 0) {
+          setDriverData(prev => ({ ...prev, age: calculatedAge.toString() }));
+        }
+      }
       
       // Clear validation errors when user starts typing
       if (validationErrors[field]) {
@@ -185,7 +241,7 @@ function App() {
         errors.age = 'Age must be between 18 and 100';
       }
       if (!vehicleData.regularDriver.idNumber || !validateIdNumber(vehicleData.regularDriver.idNumber)) {
-        errors.idNumber = 'ID number must be exactly 13 digits';
+        errors.idNumber = 'Please enter a valid 13-digit South African ID number';
       }
       if (!vehicleData.regularDriver.emailAddress.trim()) {
         errors.emailAddress = 'Email is required';
@@ -195,6 +251,15 @@ function App() {
       }
       if (!driverData.licenseDate) {
         errors.licenseDate = 'License issue date is required';
+      }
+
+      // Cross-validate age with ID number
+      if (vehicleData.regularDriver.idNumber && validateIdNumber(vehicleData.regularDriver.idNumber)) {
+        const idAge = extractAgeFromIdNumber(vehicleData.regularDriver.idNumber);
+        const enteredAge = parseInt(driverData.age);
+        if (Math.abs(idAge - enteredAge) > 1) {
+          errors.age = 'Age does not match ID number';
+        }
       }
     }
 
@@ -244,14 +309,14 @@ function App() {
       const responseText = await response.text();
       let result;
       
-      if (responseText) {
+      if (responseText.trim()) {
         try {
           result = JSON.parse(responseText);
         } catch {
           result = { success: false, error: 'Invalid response format' };
         }
       } else {
-        result = { success: false, error: 'Empty response' };
+        result = { success: false, error: 'Empty response from server' };
       }
 
       setQuoteResult(result);
@@ -298,20 +363,20 @@ function App() {
       const responseText = await response.text();
       let result;
       
-      if (responseText) {
+      if (responseText.trim()) {
         try {
           result = JSON.parse(responseText);
         } catch {
           result = { success: false, error: 'Invalid response format' };
         }
       } else {
-        result = { success: false, error: 'Empty response' };
+        result = { success: false, error: 'Empty response from server' };
       }
 
       if (result.success) {
         alert('Lead transferred successfully!');
-        if (result.data?.redirect_url) {
-          window.open(result.data.redirect_url, '_blank');
+        if (result.redirect_url) {
+          window.open(result.redirect_url, '_blank');
         }
       } else {
         alert(`Lead transfer failed: ${result.error}`);
@@ -569,6 +634,24 @@ function App() {
         </div>
 
         <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">ID Number *</label>
+          <input
+            type="text"
+            value={vehicleData.regularDriver.idNumber}
+            onChange={(e) => handleInputChange('idNumber', e.target.value, 'regularDriver')}
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+              validationErrors.idNumber ? 'border-red-500' : 'border-gray-300'
+            }`}
+            placeholder="13-digit South African ID number"
+            maxLength={13}
+          />
+          {validationErrors.idNumber && (
+            <p className="text-red-500 text-sm mt-1">{validationErrors.idNumber}</p>
+          )}
+          <p className="text-xs text-gray-500 mt-1">Age will be auto-calculated from ID number</p>
+        </div>
+
+        <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Age *</label>
           <input
             type="number"
@@ -583,23 +666,6 @@ function App() {
           />
           {validationErrors.age && (
             <p className="text-red-500 text-sm mt-1">{validationErrors.age}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">ID Number *</label>
-          <input
-            type="text"
-            value={vehicleData.regularDriver.idNumber}
-            onChange={(e) => handleInputChange('idNumber', e.target.value, 'regularDriver')}
-            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-              validationErrors.idNumber ? 'border-red-500' : 'border-gray-300'
-            }`}
-            placeholder="13-digit ID number"
-            maxLength={13}
-          />
-          {validationErrors.idNumber && (
-            <p className="text-red-500 text-sm mt-1">{validationErrors.idNumber}</p>
           )}
         </div>
 
@@ -696,7 +762,7 @@ function App() {
       <div className="text-center mb-8">
         <Shield className="w-16 h-16 text-blue-600 mx-auto mb-4" />
         <h2 className="text-3xl font-bold text-gray-900 mb-2">Coverage Options</h2>
-        <p className="text-gray-600">Choose your coverage preferences</p>
+        <p className="text-gray-600">Choose your coverage preferences and agent details</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -725,27 +791,32 @@ function App() {
             <option value="Commercial">Commercial</option>
           </select>
         </div>
+      </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Agent Name</label>
-          <input
-            type="text"
-            value={agentData.agentName}
-            onChange={(e) => handleInputChange('agentName', e.target.value, 'agent')}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Enter agent full name"
-          />
-        </div>
+      <div className="space-y-4 border-t border-gray-200 pt-6">
+        <h3 className="text-xl font-semibold text-gray-900">Agent Information (Optional)</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Agent Name</label>
+            <input
+              type="text"
+              value={agentData.agentName}
+              onChange={(e) => handleInputChange('agentName', e.target.value, 'agent')}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Enter agent full name"
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Agent Email</label>
-          <input
-            type="email"
-            value={agentData.agentEmail}
-            onChange={(e) => handleInputChange('agentEmail', e.target.value, 'agent')}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Enter agent email"
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Agent Email</label>
+            <input
+              type="email"
+              value={agentData.agentEmail}
+              onChange={(e) => handleInputChange('agentEmail', e.target.value, 'agent')}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Enter agent email"
+            />
+          </div>
         </div>
       </div>
 
@@ -785,35 +856,51 @@ function App() {
 
       {quoteResult?.success ? (
         <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-          <h3 className="text-xl font-semibold text-green-800 mb-4">Quote Successful!</h3>
+          <h3 className="text-xl font-semibold text-green-800 mb-6">Quote Successful!</h3>
           
-          {quoteResult.data?.premium && (
-            <div className="bg-white rounded-lg p-4 mb-4">
-              <div className="flex items-center justify-between">
-                <span className="text-lg font-medium text-gray-700">Monthly Premium:</span>
-                <span className="text-2xl font-bold text-green-600">R{quoteResult.data.premium.toLocaleString()}</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {quoteResult.data?.premium && (
+              <div className="bg-white rounded-lg p-6 border border-green-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="w-5 h-5 text-green-600" />
+                    <span className="text-lg font-medium text-gray-700">Monthly Premium</span>
+                  </div>
+                  <span className="text-2xl font-bold text-green-600">R{quoteResult.data.premium.toLocaleString()}</span>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {quoteResult.data?.excess && (
-            <div className="bg-white rounded-lg p-4 mb-4">
-              <div className="flex items-center justify-between">
-                <span className="text-lg font-medium text-gray-700">Excess:</span>
-                <span className="text-xl font-semibold text-blue-600">R{quoteResult.data.excess.toLocaleString()}</span>
+            {quoteResult.data?.excess && (
+              <div className="bg-white rounded-lg p-6 border border-blue-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Shield className="w-5 h-5 text-blue-600" />
+                    <span className="text-lg font-medium text-gray-700">Excess</span>
+                  </div>
+                  <span className="text-xl font-semibold text-blue-600">R{quoteResult.data.excess.toLocaleString()}</span>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          <div className="bg-white rounded-lg p-4 mb-6">
-            <h4 className="font-semibold text-gray-800 mb-2">Lead Transfer Information</h4>
-            <div className="space-y-2 text-sm text-gray-600">
-              <p><strong>Name:</strong> {driverData.firstName} {driverData.lastName}</p>
-              <p><strong>Email:</strong> {vehicleData.regularDriver.emailAddress}</p>
-              <p><strong>Contact:</strong> {vehicleData.regularDriver.mobileNumber}</p>
-              <p><strong>ID Number:</strong> {vehicleData.regularDriver.idNumber}</p>
-              {agentData.agentName && <p><strong>Agent:</strong> {agentData.agentName}</p>}
-              {agentData.agentEmail && <p><strong>Agent Email:</strong> {agentData.agentEmail}</p>}
+          <div className="bg-white rounded-lg p-6 mb-6 border border-gray-200">
+            <h4 className="font-semibold text-gray-800 mb-4 flex items-center">
+              <User className="w-5 h-5 mr-2" />
+              Lead Transfer Information
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+              <div>
+                <p><strong>Name:</strong> {driverData.firstName} {driverData.lastName}</p>
+                <p><strong>Email:</strong> {vehicleData.regularDriver.emailAddress}</p>
+                <p><strong>Contact:</strong> {vehicleData.regularDriver.mobileNumber}</p>
+              </div>
+              <div>
+                <p><strong>ID Number:</strong> {vehicleData.regularDriver.idNumber}</p>
+                {quoteResult.data?.quoteId && <p><strong>Quote ID:</strong> {quoteResult.data.quoteId}</p>}
+                {agentData.agentName && <p><strong>Agent:</strong> {agentData.agentName}</p>}
+                {agentData.agentEmail && <p><strong>Agent Email:</strong> {agentData.agentEmail}</p>}
+              </div>
             </div>
           </div>
 
@@ -831,7 +918,7 @@ function App() {
               ) : (
                 <>
                   <Phone className="w-5 h-5" />
-                  <span>Transfer Lead</span>
+                  <span>Transfer Lead to Pineapple</span>
                 </>
               )}
             </button>
@@ -840,10 +927,10 @@ function App() {
       ) : (
         <div className="bg-red-50 border border-red-200 rounded-lg p-6">
           <h3 className="text-xl font-semibold text-red-800 mb-4">Quote Failed</h3>
-          <p className="text-red-700">{quoteResult?.error || 'Unknown error occurred'}</p>
+          <p className="text-red-700 mb-4">{quoteResult?.error || 'Unknown error occurred'}</p>
           <button
             onClick={() => setCurrentStep(3)}
-            className="mt-4 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200"
+            className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200"
           >
             Try Again
           </button>

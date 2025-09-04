@@ -97,11 +97,14 @@ Deno.serve(async (req: Request) => {
 
     // Extract quote information if successful
     if (response.ok && typeof responseData === 'object') {
-      if (responseData.quoteId) {
-        updateData.quote_id = responseData.quoteId;
+      if (responseData.quote_id || responseData.quoteId) {
+        updateData.quote_id = responseData.quote_id || responseData.quoteId;
       }
       if (responseData.premium) {
         updateData.premium = responseData.premium;
+      }
+      if (responseData.excess) {
+        updateData.excess = responseData.excess;
       }
     }
 

@@ -51,6 +51,8 @@ interface QuoteResponse {
     monthly_premium?: number;
     quote_id?: string;
     quoteId?: string; // fallback for different response formats
+  }[] | {
+    quoteId?: string; // fallback for different response formats
   };
   error?: string;
 }
@@ -865,38 +867,38 @@ function App() {
           <h3 className="text-xl font-semibold text-green-800 mb-6">Quote Successful!</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {quoteResult.data?.premium && (
+            {(Array.isArray(quoteResult.data) ? quoteResult.data[0]?.premium : quoteResult.data?.premium) && (
+              <div className="bg-white rounded-lg p-6 border border-green-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="w-5 h-5 text-green-600" />
+                    <span className="text-lg font-medium text-gray-700">Premium</span>
+                  </div>
+                  <span className="text-2xl font-bold text-green-600">R{(Array.isArray(quoteResult.data) ? quoteResult.data[0]?.premium : quoteResult.data?.premium)?.toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+
+            {(Array.isArray(quoteResult.data) ? quoteResult.data[0]?.monthly_premium : quoteResult.data?.monthly_premium) && (
               <div className="bg-white rounded-lg p-6 border border-green-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <DollarSign className="w-5 h-5 text-green-600" />
                     <span className="text-lg font-medium text-gray-700">Monthly Premium</span>
                   </div>
-                  <span className="text-2xl font-bold text-green-600">R{quoteResult.data.premium.toLocaleString()}</span>
+                  <span className="text-2xl font-bold text-green-600">R{(Array.isArray(quoteResult.data) ? quoteResult.data[0]?.monthly_premium : quoteResult.data?.monthly_premium)?.toLocaleString()}</span>
                 </div>
               </div>
             )}
 
-            {quoteResult.data?.monthly_premium && (
-              <div className="bg-white rounded-lg p-6 border border-green-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <DollarSign className="w-5 h-5 text-green-600" />
-                    <span className="text-lg font-medium text-gray-700">Monthly Premium</span>
-                  </div>
-                  <span className="text-2xl font-bold text-green-600">R{quoteResult.data.monthly_premium.toLocaleString()}</span>
-                </div>
-              </div>
-            )}
-
-            {quoteResult.data?.excess && (
+            {(Array.isArray(quoteResult.data) ? quoteResult.data[0]?.excess : quoteResult.data?.excess) && (
               <div className="bg-white rounded-lg p-6 border border-blue-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <Shield className="w-5 h-5 text-blue-600" />
                     <span className="text-lg font-medium text-gray-700">Excess</span>
                   </div>
-                  <span className="text-xl font-semibold text-blue-600">R{quoteResult.data.excess.toLocaleString()}</span>
+                  <span className="text-xl font-semibold text-blue-600">R{(Array.isArray(quoteResult.data) ? quoteResult.data[0]?.excess : quoteResult.data?.excess)?.toLocaleString()}</span>
                 </div>
               </div>
             )}
@@ -925,8 +927,8 @@ function App() {
               </div>
               <div>
                 <p><strong>ID Number:</strong> {vehicleData.regularDriver.idNumber}</p>
-                {(quoteResult.data?.quote_id || quoteResult.data?.quoteId) && (
-                  <p><strong>Quote ID:</strong> {quoteResult.data.quote_id || quoteResult.data.quoteId}</p>
+                {(Array.isArray(quoteResult.data) ? (quoteResult.data[0]?.quote_id || quoteResult.data[0]?.quoteId) : (quoteResult.data?.quote_id || quoteResult.data?.quoteId)) && (
+                  <p><strong>Quote ID:</strong> {Array.isArray(quoteResult.data) ? (quoteResult.data[0]?.quote_id || quoteResult.data[0]?.quoteId) : (quoteResult.data?.quote_id || quoteResult.data?.quoteId)}</p>
                 )}
                 {agentData.agentName && <p><strong>Agent:</strong> {agentData.agentName}</p>}
                 {agentData.agentEmail && <p><strong>Agent Email:</strong> {agentData.agentEmail}</p>}

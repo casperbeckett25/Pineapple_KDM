@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Car, Shield, DollarSign, CheckCircle, AlertCircle, Loader2, CarIcon } from 'lucide-react';
+import { Car, Shield, DollarSign, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import './glass.css';
 
@@ -9,7 +9,7 @@ interface FormData {
   email: string;
   id_number: string;
   contact_number: string;
-  // agent_name removed from the form data - we'll send "OnlineLead" on submit
+  agent_name: string;
 }
 
 interface FormErrors {
@@ -79,6 +79,7 @@ function App() {
     email: '',
     id_number: '',
     contact_number: '',
+    agent_name: '',
   });
   
   const [errors, setErrors] = useState<FormErrors>({});
@@ -113,15 +114,17 @@ function App() {
       newErrors.id_number = 'ID number must be 13 digits';
     }
     
-    // agent_name validation removed
-
+    if (!formData.agent_name.trim()) {
+      newErrors.agent_name = 'Agent name is required';
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value } as FormData));
+    setFormData(prev => ({ ...prev, [name]: value }));
     
     // Clear error when user starts typing
     if (errors[name]) {
@@ -155,8 +158,7 @@ function App() {
           id_number: formData.id_number || '',
           meta_data: {},
           contact_number: formData.contact_number,
-          // send default agent_name as "OnlineLead"
-          agent_name: 'OnlineLead',
+          agent_name: formData.agent_name,
         }),
       });
       
@@ -197,6 +199,7 @@ function App() {
           email: '',
           id_number: '',
           contact_number: '',
+          agent_name: '',
         });
       } else {
         setApiResponse(data);
@@ -280,19 +283,19 @@ function App() {
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
         {/* Hero Section */}
         <div className="text-center mb-12">
-          <div
+        <div
             className="glass-logo mb-4"
-            style={{ width: '200px', height: '200px' }}
-          >
+            style={{ width: '200px', height: '200px' }} /* larger wrapper */
+        >
             <img
-              src="https://kodomconnect.co.za/kodomconnectlogo.png"
-              alt="Kodom Connect Logo"
-              style={{ width: '150px', height: '150px', objectFit: 'contain' }}
+            src="https://kodomconnect.co.za/kodomconnectlogo.png"
+            alt="Kodom Connect Logo"
+            style={{ width: '150px', height: '150px', objectFit: 'contain' }} /* larger image */
             />
-          </div>
-          <h2 className="text-4xl font-bold text-gray-900 mb-6">
-          Smart Protection Starts With You 🫶
-          </h2>
+        </div>
+        <h2 className="text-4xl font-bold text-gray-900 mb-6">
+            Quick Quotation
+        </h2>
         </div>
 
         {/* Form */}
@@ -415,6 +418,29 @@ function App() {
               )}
             </div>
 
+            {/* Agent Name */}
+            <div>
+              <label htmlFor="agent_name" className="block text-sm font-medium text-gray-700 mb-2">
+                Agent Name *
+              </label>
+              <input
+                type="text"
+                id="agent_name"
+                name="agent_name"
+                value={formData.agent_name}
+                onChange={handleInputChange}
+                className={`w-full px-4 py-3 rounded-lg transition-colors duration-200 ${
+                  errors.agent_name
+                    ? 'border-red-300 focus:border-red-500'
+                    : 'border-transparent focus:border-blue-300'
+                } focus:outline-none focus:ring-2 focus:ring-blue-50 glass-input`}
+                placeholder="Enter the agent's name"
+              />
+              {errors.agent_name && (
+                <p className="mt-1 text-sm text-red-600">{errors.agent_name}</p>
+              )}
+            </div>
+
             {/* Submit Button */}
             <button
               type="submit"
@@ -424,12 +450,12 @@ function App() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  <span>Generating Quotation...</span>
+                  <span>Sending Client Info...</span>
                 </>
               ) : (
                 <>
-                  <span>Generate Quotation</span>
-                  <CarIcon className="h-5 w-5" />
+                  <span>Submit Lead</span>
+                  <DollarSign className="h-5 w-5" />
                 </>
               )}
             </button>
@@ -439,12 +465,12 @@ function App() {
               <div className="bg-green-50 p-6 rounded-lg border border-green-200">
                 <div className="flex items-center space-x-2 text-green-600 mb-4">
                   <CheckCircle className="h-6 w-6" />
-                  <span className="text-lg font-semibold">Thank you 😉, an agent will give you a call shortly</span>
+                  <span className="text-lg font-semibold">Success!</span>
                 </div>
                 {apiResponse && apiResponse.data && (
                   <>
                     <div className="text-gray-700 mb-4">
-                      <strong>Quote Reference:</strong> {apiResponse.data.uuid}
+                      <strong>Lead Reference:</strong> {apiResponse.data.uuid}
                     </div>
                     {apiResponse.data.redirect_url && (
                       <a
@@ -453,7 +479,7 @@ function App() {
                         rel="noopener noreferrer"
                         className="inline-block bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
                       >
-                        Continue to Your Quote
+                        Continue to Your Lead
                       </a>
                     )}
                   </>
@@ -505,15 +531,15 @@ function App() {
               <Shield className="h-6 w-6 text-blue-600" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Comprehensive Coverage</h3>
-            <p className="text-gray-600">Reliable protection for your vehicle, backed by complete peace of mind.</p>
+            <p className="text-gray-600">Protection for your vehicle and peace of mind</p>
           </div>
           
           <div className="benefit-card">
             <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-lg mb-4">
               <DollarSign className="h-6 w-6 text-blue-600" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Best Discounts</h3>
-            <p className="text-gray-600">Access competitive quotes from leading insurers to ensure optimal value.</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Best Prices</h3>
+            <p className="text-gray-600">Compare quotes from top insurers instantly</p>
           </div>
           
           <div className="benefit-card">
@@ -521,7 +547,7 @@ function App() {
               <CheckCircle className="h-6 w-6 text-blue-600" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Quick Process</h3>
-            <p className="text-gray-600">Receive an accurate insurance quote within seconds through our streamlined system.</p>
+            <p className="text-gray-600">Get your quote in under 5 minutes</p>
           </div>
         </div>
       </div>

@@ -1,0 +1,259 @@
+/* Updated glass.css
+   - Larger logo
+   - stronger "nice" shadows on inputs (and focus lift)
+   - multiple floating cars with RTL sweep
+   - retains existing glassmorphism blobs & card styles
+*/
+
+:root{
+    --glass-bg: rgba(255,255,255,0.18);
+    --glass-border: rgba(255,255,255,0.35);
+    --glass-accent: rgba(255,255,255,0.08);
+    --glass-shadow: 0 8px 30px rgba(13, 38, 76, 0.12);
+    --glass-border-gradient: linear-gradient(135deg, rgba(255,255,255,0.6), rgba(255,255,255,0.12));
+    --input-shadow: 0 6px 20px rgba(2,6,23,0.06);
+    --input-focus-shadow: 0 14px 40px rgba(37,99,235,0.14);
+  }
+  
+  /* header override for consistent glass look */
+  .header-bar{
+    background: linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.5));
+    border-bottom: 1px solid rgba(15, 51, 88, 0.06);
+    backdrop-filter: blur(6px) saturate(120%);
+    -webkit-backdrop-filter: blur(6px) saturate(120%);
+  }
+  
+  /* decorative blurred blobs in the background */
+  .bg-decor{
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+  
+  .blob{
+    position: absolute;
+    filter: blur(60px) saturate(120%);
+    opacity: 0.6;
+    transform: translateZ(0);
+    will-change: transform, opacity;
+  }
+  
+  .blob.b1{
+    width: 420px;
+    height: 420px;
+    left: -80px;
+    top: -40px;
+    background: radial-gradient(circle at 30% 20%, rgba(99,102,241,0.35), rgba(99,102,241,0.14) 40%, transparent 60%);
+    animation: floatSlow 12s ease-in-out infinite;
+  }
+  
+  .blob.b2{
+    width: 380px;
+    height: 380px;
+    right: -120px;
+    top: -80px;
+    background: radial-gradient(circle at 70% 30%, rgba(59,130,246,0.28), rgba(124,58,237,0.08) 40%, transparent 60%);
+    animation: floatSlow 14s ease-in-out infinite;
+  }
+  
+  .blob.b3{
+    width: 360px;
+    height: 360px;
+    left: 10%;
+    bottom: -120px;
+    background: radial-gradient(circle at 40% 60%, rgba(16,185,129,0.18), rgba(99,102,241,0.06) 50%, transparent 70%);
+    animation: floatSlow 16s ease-in-out infinite;
+  }
+  
+  @keyframes floatSlow {
+    0% { transform: translateY(0) translateX(0) scale(1); opacity: 0.85; }
+    50% { transform: translateY(-18px) translateX(8px) scale(1.03); opacity: 0.9; }
+    100% { transform: translateY(0) translateX(0) scale(1); opacity: 0.85; }
+  }
+  
+  /* glass card for main form */
+  .glass-card{
+    background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06));
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.18);
+    box-shadow: var(--glass-shadow);
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    position: relative;
+    overflow: hidden;
+    z-index: 2;
+  }
+  .glass-card::before{
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    pointer-events: none;
+  }
+  
+  /* BIGGER placed logo inside glassy circle */
+  .glass-logo{
+    background: rgba(255,255,255,0.08);
+    padding: 16px;
+    border-radius: 18px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.08);
+    width: 100px;
+    height: 100px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    box-shadow: 0 10px 30px rgba(7, 24, 50, 0.06);
+  }
+  .glass-logo img{
+    width: 78px;
+    height: 78px;
+    object-fit: contain;
+  }
+  
+  /* input styling for glass look + nicer external shadow */
+  .glass-input{
+    background: rgba(255,255,255,0.04);
+    color: #07203a;
+    border-radius: 10px;
+    box-shadow: var(--input-shadow), inset 0 1px 0 rgba(255,255,255,0.02);
+    transition: box-shadow 180ms ease, transform 180ms ease;
+    border: 1px solid rgba(10, 30, 60, 0.03);
+  }
+  
+  /* focus lift for inputs */
+  .glass-input:focus{
+    box-shadow: var(--input-focus-shadow), 0 6px 24px rgba(2,6,23,0.06), inset 0 1px 0 rgba(255,255,255,0.02);
+    transform: translateY(-2px);
+    outline: none;
+  }
+  
+  /* submit / CTA */
+  .glass-button{
+    background: linear-gradient(90deg, #2563eb, #4f46e5);
+    border-radius: 12px;
+    box-shadow: 0 8px 28px rgba(79,70,229,0.18), inset 0 -1px 0 rgba(255,255,255,0.08);
+  }
+  
+  /* benefit cards styled as glass */
+  .benefit-card{
+    padding: 1.5rem;
+    background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.06);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 6px 20px rgba(13,38,76,0.06);
+  }
+  
+  /* Floating emojis container */
+  .floating-emojis{
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+  
+  /* each emoji uses a gentle bobbing + horizontal drift */
+  .floating-emoji{
+    position: absolute;
+    transform: translate(-50%, -50%) translateZ(0);
+    display: inline-block;
+    will-change: transform, opacity;
+    animation: bob 6s ease-in-out infinite, drift 24s linear infinite;
+    opacity: 0.95;
+    filter: drop-shadow(0 6px 14px rgba(3,7,18,0.12));
+  }
+  
+  @keyframes bob {
+    0% { transform: translate(-50%, -50%) translateY(0) rotate(0deg) scale(1); }
+    25% { transform: translate(-50%, -50%) translateY(-8px) rotate(2deg) scale(1.02); }
+    50% { transform: translate(-50%, -50%) translateY(0) rotate(0deg) scale(1); }
+    75% { transform: translate(-50%, -50%) translateY(6px) rotate(-2deg) scale(0.98); }
+    100% { transform: translate(-50%, -50%) translateY(0) rotate(0deg) scale(1); }
+  }
+  
+  @keyframes drift {
+    0% { transform: translate(-50%, -50%) translateX(0); }
+    50% { transform: translate(-50%, -50%) translateX(12px); }
+    100% { transform: translate(-50%, -50%) translateX(0); }
+  }
+  
+  /* Floating car(s) styling/animation: LTR (existing) + RTL (new) */
+  .floating-car-wrapper{
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    transform: translateZ(0);
+  }
+  
+  /* base style */
+  .floating-car{
+    width: 320px;
+    height: auto;
+    opacity: 0.09;
+    color: rgba(10, 40, 80, 0.95);
+    filter: blur(0.3px) saturate(120%);
+    transform-origin: center;
+    will-change: transform, opacity;
+    position: absolute;
+  }
+  
+  /* size variants */
+  .floating-car.small { width: 160px; opacity: 0.08; }
+  .floating-car.mid   { width: 220px; opacity: 0.10; }
+  .floating-car.large { width: 360px; opacity: 0.06; }
+  
+  /* left-to-right sweep (keep as-is for left-side cars) */
+  .floating-car.ltr{
+    animation: carSweepLTR 18s linear infinite;
+  }
+  
+  /* right-to-left sweep for cars coming from right */
+  .floating-car.rtl{
+    animation: carSweepRTL 14s linear infinite;
+  }
+  
+  /* subtle variation using animation-delay (can be set inline or here) */
+  .floating-car.delay-1 { animation-delay: 0.8s; }
+  .floating-car.delay-2 { animation-delay: 2.1s; }
+  .floating-car.delay-3 { animation-delay: 3.6s; }
+  
+  /* LTR keyframes */
+  @keyframes carSweepLTR {
+    0%   { transform: translateX(-20vw) translateY(0) rotate(-5deg) scale(1); opacity: 0.08; }
+    30%  { transform: translateX(40vw) translateY(-4px) rotate(0deg) scale(1.02); opacity: 0.12; }
+    60%  { transform: translateX(80vw) translateY(0px) rotate(5deg) scale(1); opacity: 0.08; }
+    100% { transform: translateX(120vw) translateY(6px) rotate(0deg) scale(0.98); opacity: 0.06; }
+  }
+  
+  /* RTL keyframes (cars start off right, sweep left across view) */
+  @keyframes carSweepRTL {
+    0%   { transform: translateX(120vw) translateY(8px) rotate(5deg) scale(1); opacity: 0.06; }
+    20%  { transform: translateX(70vw) translateY(2px) rotate(2deg) scale(1.02); opacity: 0.10; }
+    50%  { transform: translateX(40vw) translateY(-6px) rotate(0deg) scale(1.03); opacity: 0.12; }
+    80%  { transform: translateX(-10vw) translateY(-2px) rotate(-4deg) scale(1); opacity: 0.08; }
+    100% { transform: translateX(-30vw) translateY(6px) rotate(-6deg) scale(0.98); opacity: 0.05; }
+  }
+  
+  /* ensure text contrast on glass background */
+  input::placeholder{
+    color: rgba(5, 30, 50, 0.35);
+  }
+  
+  /* reduced motion preference */
+  @media (prefers-reduced-motion: reduce) {
+    .blob, .floating-emoji, .floating-car, .glass-card, .bg-decor { animation: none !important; transition: none !important; transform: none !important; }
+  }
+  
+  /* responsive tweaks */
+  @media (max-width: 640px){
+    .glass-logo{ width: 96px; height: 96px; }
+    .glass-logo img{ width: 64px; height: 64px; }
+    .floating-car{ width: 220px; }
+    .blob.b1, .blob.b2, .blob.b3 { opacity: 0.5; }
+  }
